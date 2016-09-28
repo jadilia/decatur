@@ -5,7 +5,7 @@
 ##
 ## Query String: {&quot;sort&quot;:&quot;kic&quot;,&quot;kics&quot;:[],&quot;campaign&quot;:[&quot;-2&quot;],&quot;etvlong&quot;:true,&quot;cols&quot;:[&quot;sdepth&quot;,&quot;glon&quot;,&quot;scdata&quot;,&quot;camp&quot;,&quot;pteff&quot;,&quot;cteff&quot;,&quot;ra&quot;,&quot;bjd0&quot;,&quot;morph&quot;,&quot;glat&quot;,&quot;n&quot;,&quot;koi&quot;,&quot;pdepth&quot;,&quot;kic&quot;,&quot;lcdata&quot;,&quot;dec&quot;,&quot;koiid&quot;,&quot;keff&quot;,&quot;p&quot;,&quot;sep&quot;,&quot;pwidth&quot;,&quot;swidth&quot;,&quot;bjd0err&quot;,&quot;perr&quot;,&quot;kmag&quot;],&quot;etvshort&quot;:true,&quot;incat1&quot;:true,&quot;kois&quot;:[]}
 ##
-#KIC,camp,KOI,Mult,period,period_err,bjd0,bjd0_err,pdepth,sdepth,pwidth,swidth,sep,morph,RA,DEC,GLon,GLat,kmag,Teff,Teff(Pinsonneault),Teff(Casagrande),KOI,SC,
+KIC,camp,KOI,Mult,period,period_err,bjd0,bjd0_err,pdepth,sdepth,pwidth,swidth,sep,morph,RA,DEC,GLon,GLat,kmag,Teff,Teff(Pinsonneault),Teff(Casagrande),KOI,SC,
 1026032,Kepler,-1,1,8.4604378,0.0000230,54966.773813,0.030112,0.0710,0.0270,0.0203,0.0201,0.5266,0.15,291.0441,36.7293,69.3036,9.8547,14.8130,5715.0000,6054.0000,6210.0000,False,False,
 1026957,Kepler,958,1,21.7613058,0.0000881,54956.017106,0.011314,0.0011,-1.0000,0.0031,-1.0000,1.0000,0.01,291.2545,36.7436,69.3933,9.7104,12.5590,4845.0000,4917.0000,5024.0000,True,True,
 1161345,Kepler,984,1,4.2874555,0.0000086,55005.028983,0.023798,0.0004,-1.0000,0.0290,-1.0000,1.0000,0.24,291.0488,36.8399,69.4057,9.9008,11.6310,5836.0000,5518.0000,5631.0000,True,True,
