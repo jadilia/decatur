@@ -87,9 +87,9 @@ class EclipsingBinary(object):
 
     Parameters
     ----------
-    light_curve : LightCurve object
+    l_curve : LightCurve object
         Object containing the light curve data
-    binary_params : BinaryParameters objects
+    params : BinaryParameters objects
         Object containing the eclipsing binary parameters
 
     Raises
@@ -98,8 +98,8 @@ class EclipsingBinary(object):
         If there are multiple entries for the system in the KEBC
     """
     def __init__(self, light_curve=None, binary_params=None):
-        self.light_curve = light_curve
-        self.binary_params = binary_params
+        self.l_curve = light_curve
+        self.params = binary_params
 
     @classmethod
     def from_kic(cls, kic, catalog_file='kebc.csv', use_pdc=True,
@@ -169,26 +169,26 @@ class EclipsingBinary(object):
         poly_order: int, optional
             The order of the polynomial fit.
         """
-        self.light_curve.fluxes_original = np.copy(self.light_curve.fluxes)
+        self.l_curve.fluxes_original = np.copy(self.l_curve.fluxes)
 
         # "Empty" array to hold detrended fluxes
-        fluxes_detrended = np.zeros_like(self.light_curve.fluxes)
+        fluxes_detrended = np.zeros_like(self.l_curve.fluxes)
 
-        for quarter in np.unique(self.light_curve.quarters):
-            mask = self.light_curve.quarters == quarter
+        for quarter in np.unique(self.l_curve.quarters):
+            mask = self.l_curve.quarters == quarter
 
             # Compute polynomial fit
-            poly = np.polyfit(self.light_curve.times[mask],
-                              self.light_curve.fluxes[mask], poly_order)
+            poly = np.polyfit(self.l_curve.times[mask],
+                              self.l_curve.fluxes[mask], poly_order)
             z = np.poly1d(poly)
 
             # Subtract fit and median normalize
-            fluxes_detrended[mask] = (self.light_curve.fluxes[mask]
-                                      - z(self.light_curve.times[mask])) \
-                / np.nanmedian(self.light_curve.fluxes[mask])
+            fluxes_detrended[mask] = (self.l_curve.fluxes[mask]
+                                      - z(self.l_curve.times[mask])) \
+                / np.nanmedian(self.l_curve.fluxes[mask])
 
-        self.light_curve.fluxes_detrended = np.copy(fluxes_detrended)
-        self.light_curve.fluxes = np.copy(fluxes_detrended)
+        self.l_curve.fluxes_detrended = np.copy(fluxes_detrended)
+        self.l_curve.fluxes = np.copy(fluxes_detrended)
 
     def phase_fold(self, period_fold=None):
         """
@@ -205,16 +205,16 @@ class EclipsingBinary(object):
         phase : numpy.ndarray
             The orbital phase.
         """
-        if self.binary_params.in_kebc:
+        if self.params.in_kebc:
             # Subtract offset for Kepler mission days
-            bjd_0 = self.binary_params.bjd_0 - 54833
+            bjd_0 = self.params.bjd_0 - 54833
         else:
-            bjd_0 = self.binary_params.bjd_0
+            bjd_0 = self.params.bjd_0
 
         if period_fold is None:
-            period_fold = self.binary_params.p_orb
+            period_fold = self.params.p_orb
 
-        phase = ((self.light_curve.times - bjd_0) % period_fold) / period_fold
+        phase = ((self.l_curve.times - bjd_0) % period_fold) / period_fold
 
         return phase
 
@@ -231,15 +231,15 @@ class EclipsingBinary(object):
 
         window /= 2
 
-        mask = ((phase > self.binary_params.width_pri * window)
-                & (phase < 1 - self.binary_params.width_pri * window)) \
-            & ((phase > self.binary_params.sep + self.binary_params.width_sec * window)
-               | (phase < self.binary_params.sep - self.binary_params.width_sec * window))
+        mask = ((phase > self.params.width_pri * window)
+                & (phase < 1 - self.params.width_pri * window)) \
+            & ((phase > self.params.sep + self.params.width_sec * window)
+               | (phase < self.params.sep - self.params.width_sec * window))
 
-        fluxes_interp = np.copy(self.light_curve.fluxes)
-        fluxes_interp[~mask] = np.interp(self.light_curve.times[~mask],
-                                         self.light_curve.times[mask],
-                                         self.light_curve.fluxes[mask])
+        fluxes_interp = np.copy(self.l_curve.fluxes)
+        fluxes_interp[~mask] = np.interp(self.l_curve.times[~mask],
+                                         self.l_curve.times[mask],
+                                         self.l_curve.fluxes[mask])
 
-        self.light_curve.fluxes_interp = np.copy(fluxes_interp)
-        self.light_curve.fluxes = np.copy(fluxes_interp)
+        self.l_curve.fluxes_interp = np.copy(fluxes_interp)
+        self.l_curve.fluxes = np.copy(fluxes_interp)
