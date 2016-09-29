@@ -135,10 +135,11 @@ class EclipsingBinary(object):
             depth_sec = df[matching_kic]['sdepth'].values[0]
             width_pri = df[matching_kic]['pwidth'].values[0]
             width_sec = df[matching_kic]['swidth'].values[0]
+            sep = df[matching_kic]['sep'].values[0]
 
             binary_params = BinaryParameters(p_orb, bjd_0, depth_pri,
                                              depth_sec, width_pri, width_sec,
-                                             kic)
+                                             sep, kic)
 
             return cls(light_curve, binary_params)
 
