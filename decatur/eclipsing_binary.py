@@ -4,6 +4,7 @@
 from __future__ import print_function, division, absolute_import
 
 import numpy as np
+from gatspy.periodic import LombScargleFast
 
 from . import kepler_data
 from . import utils
@@ -102,6 +103,9 @@ class EclipsingBinary(object):
     def __init__(self, light_curve=None, binary_params=None):
         self.l_curve = light_curve
         self.params = binary_params
+
+        self.periods = None
+        self.powers = None
 
     @classmethod
     def from_kic(cls, kic, catalog_file='kebc.csv', use_pdc=True,
@@ -254,3 +258,18 @@ class EclipsingBinary(object):
 
         self.l_curve.fluxes_interp = np.copy(fluxes_interp)
         self.l_curve.fluxes = np.copy(fluxes_interp)
+
+    def run_periodogram(self, oversampling=5):
+        """
+        Compute a periodogram using gatspy.LombScargleFast.
+
+        Parameters
+        ----------
+        oversampling : int, optional
+            The oversampling factor for the periodogram.
+        """
+        model = LombScargleFast().fit(self.l_curve.times,
+                                      self.l_curve.fluxes,
+                                      self.l_curve.flux_errs)
+
+        self.periods, self.powers = model.periodogram_auto(oversampling=oversampling)
