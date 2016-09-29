@@ -43,6 +43,8 @@ class BinaryParameters(object):
         self.sep = sep
         self.kic = kic
 
+        self.in_kebc = False
+
 
 class LightCurve(object):
     """
@@ -73,6 +75,10 @@ class LightCurve(object):
         self.cadences = cadences
         self.quarters = quarters
         self.flags = flags
+
+        self.fluxes_original = None
+        self.fluxes_detrend = None
+        self.fluxes_interp = None
 
 
 class EclipsingBinary(object):
@@ -108,9 +114,11 @@ class EclipsingBinary(object):
         catalog_file : str, optional
             The name of the CSV file containing the KEBC
         use_pdc : bool, optional
-            Defaults to True. If True, use the PDCSAP data instead of the raw SAP.
+            Defaults to True. If True, use the PDCSAP data instead of
+            the raw SAP.
         long_cadence : bool, optional
-            Whether to select long or short cadence. Defaults to True, or LC data.
+            Whether to select long or short cadence. Defaults to True,
+            or LC data.
         from_db : bool, optional
             Default loads data from the MySQL database.
             Set to False to load data from MAST using the kplr package.
@@ -140,6 +148,7 @@ class EclipsingBinary(object):
             binary_params = BinaryParameters(p_orb, bjd_0, depth_pri,
                                              depth_sec, width_pri, width_sec,
                                              sep, kic)
+            binary_params.in_kebc = True
 
             return cls(light_curve, binary_params)
 
@@ -150,3 +159,87 @@ class EclipsingBinary(object):
 
         elif number_of_entries > 1:
             raise CatalogMatchError('Multiple entries in catalog for KIC {}'.format(kic))
+
+    def detrend_and_normalize(self, poly_order=3):
+        """
+        Detrend and normalize light curve with a low order polynomial.
+
+        Light curves are detrended on a per-quarter basis.
+
+        poly_order: int, optional
+            The order of the polynomial fit.
+        """
+        self.light_curve.fluxes_original = np.copy(self.light_curve.fluxes)
+
+        # "Empty" array to hold detrended fluxes
+        fluxes_detrended = np.zeros_like(self.light_curve.fluxes)
+
+        for quarter in np.unique(self.light_curve.quarters):
+            mask = self.light_curve.quarters == quarter
+
+            # Compute polynomial fit
+            poly = np.polyfit(self.light_curve.times[mask],
+                              self.light_curve.fluxes[mask], poly_order)
+            z = np.poly1d(poly)
+
+            # Subtract fit and median normalize
+            fluxes_detrended[mask] = (self.light_curve.fluxes[mask]
+                                      - z(self.light_curve.times[mask])) \
+                / np.nanmedian(self.light_curve.fluxes[mask])
+
+        self.light_curve.fluxes_detrended = np.copy(fluxes_detrended)
+        self.light_curve.fluxes = np.copy(fluxes_detrended)
+
+    def phase_fold(self, period_fold=None):
+        """
+        Phase fold the light curve at given period.
+        Uses the orbital period by default.
+
+        Parameters
+        ----------
+        period_fold : float, optional
+            Specify a different period at which to fold.
+
+        Returns
+        -------
+        phase : numpy.ndarray
+            The orbital phase.
+        """
+        if self.binary_params.in_kebc:
+            # Subtract offset for Kepler mission days
+            bjd_0 = self.binary_params.bjd_0 - 54833
+        else:
+            bjd_0 = self.binary_params.bjd_0
+
+        if period_fold is None:
+            period_fold = self.binary_params.p_orb
+
+        phase = ((self.light_curve.times - bjd_0) % period_fold) / period_fold
+
+        return phase
+
+    def interpolate_over_eclipse(self, window=1.):
+        """
+        Linearly interpolate over the eclipses.
+
+        Parameters
+        ----------
+        window : float, optional
+            The fraction of the eclipse width to interpolate over.
+        """
+        phase = self.phase_fold()
+
+        window /= 2
+
+        mask = ((phase > self.binary_params.width_pri * window)
+                & (phase < 1 - self.binary_params.width_pri * window)) \
+            & ((phase > self.binary_params.sep + self.binary_params.width_sec * window)
+               | (phase < self.binary_params.sep - self.binary_params.width_sec * window))
+
+        fluxes_interp = np.copy(self.light_curve.fluxes)
+        fluxes_interp[~mask] = np.interp(self.light_curve.times[~mask],
+                                         self.light_curve.times[mask],
+                                         self.light_curve.fluxes[mask])
+
+        self.light_curve.fluxes_interp = np.copy(fluxes_interp)
+        self.light_curve.fluxes = np.copy(fluxes_interp)
