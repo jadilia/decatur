@@ -79,6 +79,8 @@ class LightCurve(object):
         self.fluxes_original = None
         self.fluxes_detrend = None
         self.fluxes_interp = None
+        self.flux_errs_original = None
+        self.flux_errs_normed = None
 
 
 class EclipsingBinary(object):
@@ -170,9 +172,11 @@ class EclipsingBinary(object):
             The order of the polynomial fit.
         """
         self.l_curve.fluxes_original = np.copy(self.l_curve.fluxes)
+        self.l_curve.flux_errs_original = np.copy(self.l_curve.flux_errs)
 
         # "Empty" array to hold detrended fluxes
         fluxes_detrended = np.zeros_like(self.l_curve.fluxes)
+        flux_errs_normed = np.zeros_like(self.l_curve.flux_errs)
 
         for quarter in np.unique(self.l_curve.quarters):
             mask = self.l_curve.quarters == quarter
@@ -182,13 +186,20 @@ class EclipsingBinary(object):
                               self.l_curve.fluxes[mask], poly_order)
             z = np.poly1d(poly)
 
+            median_flux = np.nanmedian(self.l_curve.fluxes[mask])
+
             # Subtract fit and median normalize
             fluxes_detrended[mask] = (self.l_curve.fluxes[mask]
                                       - z(self.l_curve.times[mask])) \
-                / np.nanmedian(self.l_curve.fluxes[mask])
+                / median_flux
+
+            flux_errs_normed[mask] = self.l_curve.flux_errs[mask] / median_flux
 
         self.l_curve.fluxes_detrended = np.copy(fluxes_detrended)
         self.l_curve.fluxes = np.copy(fluxes_detrended)
+
+        self.l_curve.flux_errs_normed = np.copy(flux_errs_normed)
+        self.l_curve.flux_errs = np.copy(flux_errs_normed)
 
     def phase_fold(self, period_fold=None):
         """
