@@ -163,7 +163,8 @@ def loadlc(kic, use_pdc=True, long_cadence=True, from_db=True,
                 cursor.close()
                 db.close()
 
-                # For some reason some results are coming back with arrays of length 0.
+                # For some reason some results are coming back with
+                # arrays of length 0.
                 if len(times) > 0:
                     got_it = True
 
@@ -174,9 +175,9 @@ def loadlc(kic, use_pdc=True, long_cadence=True, from_db=True,
                 count += 1
 
         # Guarantee the light curve is in sequential order
-        # %timeit says that doing the ordering in Python is faster than including
-        # an 'ORDER BY time' flag in the MySQL search. I have no idea why, but
-        # I'll keep doing the ordering here.
+        # %timeit says that doing the ordering in Python is faster than
+        #  including an 'ORDER BY time' flag in the MySQL search.
+        # I have no idea why, but I'll keep doing the ordering here.
         order = np.argsort(times)
         times = times[order]
         fluxes = fluxes[order]
