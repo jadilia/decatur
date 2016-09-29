@@ -8,21 +8,18 @@ class CatalogMatchError(Exception):
     """
     Raised when there are no matching entries in the EB catalog.
     """
-    def __init__(self, message):
-        self.message = message
+    pass
 
 
 class DatabaseSetupError(Exception):
     """
     Raised if the light curve database environment variables are not defined.
     """
-    def __init__(self, message):
-        self.message = message
+    pass
 
 
 class NoLightCurvesError(Exception):
     """
     Raised if there are no light curves for given target in the database.
     """
-    def __init__(self, message):
-        self.message = message
+    pass
