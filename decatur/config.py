@@ -5,6 +5,11 @@ from __future__ import print_function, division, absolute_import
 
 import os
 
+# Data directory
+data_dir = os.getenv('DECATUR_DATA_DIR')
+if data_dir is None:
+    data_dir = '.'
+
 # Load database parameters from environment variables
 host = os.getenv('DB_HOST')
 user = os.getenv('DB_USER')
