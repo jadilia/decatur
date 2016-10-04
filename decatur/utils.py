@@ -7,6 +7,8 @@ import os
 
 import pandas as pd
 
+from .config import data_dir
+
 
 def load_catalog(catalog_file='kebc.csv'):
     """
@@ -40,3 +42,39 @@ def load_catalog(catalog_file='kebc.csv'):
     df = pd.read_csv(catalog_file, comment='#')
 
     return df
+
+
+def merge_catalogs(kebc_file, p_rot_file):
+    """
+    Merge the Kepler Eclipsing Binary Catalog (KEBC)
+    and the rotation periods results
+
+    Parameters
+    ----------
+    kebc_file : str, optional
+        Name of the CSV file containing the KEBC.
+    p_rot_file : str, optional
+        Name of the pickle file containing the rotation periods.
+
+    Returns
+    -------
+    merge : pandas DataFrame
+        Merge results
+    """
+    p_rot_cat = pd.read_pickle('{}/{}'.format(data_dir, p_rot_file))
+    kebc = load_catalog(kebc_file)
+
+    merge = pd.merge(kebc, p_rot_cat, on='KIC')
+
+    return merge
+
+
+def is_int(string):
+    """
+    Returns True if a string represents an integer, False otherwise.
+    """
+    try:
+        int(string)
+        return True
+    except ValueError:
+        return False

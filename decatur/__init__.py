@@ -2,4 +2,4 @@
 # encoding: utf-8
 from __future__ import absolute_import
 
-from . import analyze_sample, eclipsing_binary, kepler_data
+from . import analyze_sample, eclipsing_binary, inspector, kepler_data
