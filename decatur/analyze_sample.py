@@ -79,7 +79,8 @@ def compute_periodograms(width_max=0.25, period_min=0.01, period_max=100.,
     h5.close()
 
 
-def measure_rotation_periods(periodograms_file, results_file=None):
+def measure_rotation_periods(periodograms_file, results_file=None,
+                             period_min=0.01, period_max=100.):
     """
     Measure rotation periods for the Kepler eclipsing binary sample.
 
@@ -89,6 +90,8 @@ def measure_rotation_periods(periodograms_file, results_file=None):
         HD5F file containing the periodograms.
     results_file : str, optional
         Specify an alternate output results filename.
+    period_min, period_max : float, optional
+        Will only search for `period_min` < period < `period_max`
     """
     h5 = h5py.File('{}/{}'.format(data_dir, periodograms_file), 'r')
 
@@ -106,11 +109,13 @@ def measure_rotation_periods(periodograms_file, results_file=None):
         periods = h5['{}/periods'.format(kic)][:]
         powers = h5['{}/powers'.format(kic)][:]
 
-        index_max = np.argmax(powers)
+        keep = (periods > period_min) & (periods < period_max)
+
+        index_max = np.argmax(powers[keep])
 
         rec_array[ii]['KIC'] = kic
-        rec_array[ii]['p_rot_1'] = periods[index_max]
-        rec_array[ii]['peak_power_1'] = powers[index_max]
+        rec_array[ii]['p_rot_1'] = periods[keep][index_max]
+        rec_array[ii]['peak_power_1'] = powers[keep][index_max]
 
         sys.stdout.write('\r{:.1f}% complete'.format((ii + 1) * 100 / total_systems))
         sys.stdout.flush()
