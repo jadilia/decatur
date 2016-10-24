@@ -3,8 +3,10 @@
 
 from __future__ import print_function, division, absolute_import
 
+import matplotlib.pyplot as plt
 import numpy as np
 from gatspy.periodic import LombScargleFast
+from scipy import stats, interpolate
 
 from . import kepler_data
 from . import utils
@@ -273,3 +275,100 @@ class EclipsingBinary(object):
                                       self.l_curve.flux_errs)
 
         self.periods, self.powers = model.periodogram_auto(oversampling=oversampling)
+
+    def phase_correlation(self, p_fold, t_0=0., delta_phase=0.01, cad_min=3,
+                          plot=False):
+        """
+        The cross-correlation with the median phase-folded light curve.
+
+        For a given period, compute the binned, median phase-folded light curve.
+        Then compute the cross-correlation with each successive cycle of light
+        curve at that period.
+
+        Parameters
+        ----------
+        p_fold: float
+            The period at which to fold the light curve.
+        t_0: float, optional
+            The reference time, e.g., time of primary eclipse. Default: 0.
+        delta_phase: float, optional
+            The phase bin width. Default: 0.01
+        cad_min: int, optional
+            Exclude light curve sections with fewer cadences than `cad_min`.
+        plot : bool, optional
+            Set to True to plot phase-folded light curve and cross-correlation
+
+        Returns
+        -------
+        cycle_num : numpy.ndarray
+            Cycle number.
+        corr : numpy.ndarray
+            The cross-correlation
+        """
+        # Calculate the phase.
+        phase = ((self.l_curve.times - t_0) % p_fold) / p_fold
+        # Calculate the cycle number.
+        cycle = ((self.l_curve.times - t_0) // p_fold).astype(int)
+        # Start at zero
+        cycle -= cycle.min()
+
+        # Computed binned median
+        bins = np.arange(0., 1. + delta_phase, delta_phase)
+        binned_med, bin_edges = stats.binned_statistic(phase, self.l_curve.fluxes,
+                                                       statistic="median",
+                                                       bins=bins)[:2]
+
+        bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+
+        # Wrap around at the beginning and end of the binned light curve
+        # using the fact that f(phase) = f(phase + 1)
+        wrap = ([bin_centers[-1] - 1.], bin_centers, [1. + bin_centers[0]])
+        bin_centers = np.concatenate(wrap)
+        wrap = ([binned_med[-1]], binned_med, [binned_med[0]])
+        binned_med = np.concatenate(wrap)
+
+        # Linear interpolation of binned light curve.
+        interp = interpolate.interp1d(bin_centers, binned_med)
+
+        # Only use cycles with more cadences than `cad_min`.
+        cycle_num = np.arange(cycle.max() + 1)[np.bincount(cycle) > cad_min]
+
+        # Empty array to hold cross-correlation
+        corr = np.zeros_like(cycle_num, dtype=float)
+
+        for i, n in enumerate(cycle_num):
+
+            mask = cycle == n
+
+            p = phase[mask]
+            f = self.l_curve.fluxes[mask]
+            f_i = interp(p)
+
+            # Normalize light curves
+            a = (f - np.mean(f)) / (np.std(f) * len(f))
+            v = (f_i - np.mean(f_i)) / np.std(f_i)
+
+            corr[i] = np.correlate(a, v)
+
+        if plot:
+
+            fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(10, 5))
+
+            ax1.scatter(phase, self.l_curve.fluxes, color="k", s=0.1)
+            p = np.linspace(0, 1, 1000)
+            ax1.plot(p, interp(p), color="r")
+
+            ax1.set_xlim(0, 1)
+            ymax = np.percentile(np.abs(self.l_curve.fluxes), 98)
+            ax1.set_ylim(-ymax, ymax)
+            ax1.set_xlabel("Phase")
+            ax1.set_ylabel("Normalized Flux")
+
+            ax2.plot(cycle_num * p_fold, corr, "-k", markersize=3)
+            ax2.set_ylim(-1.1, 1.1)
+            ax2.set_xlabel("Time")
+            ax2.set_ylabel("Normalized Cross-correlation")
+
+            plt.show()
+
+        return cycle_num, corr
