@@ -162,6 +162,7 @@ class InspectorGadget(object):
         self.periodogram.set_xdata(periods)
         self.periodogram.set_ydata(powers)
 
+        self.ax2.set_xlim(0, 45)
         self.ax2.set_ylim(0, 1.1 * powers.max())
 
         self.p_rot_line.set_xdata(self.results['p_rot_1'][index])
