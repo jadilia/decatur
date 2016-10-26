@@ -8,7 +8,7 @@ from __future__ import print_function, division, absolute_import
 
 
 import numpy as np
-import MySQLdb
+import pymysql
 
 from . import exceptions
 from . import utils
@@ -80,7 +80,7 @@ def __dbconnect(db_name):
         raise exceptions.DatabaseSetupError('Environment variables for the '
                                             'database are not defined.')
 
-    return MySQLdb.connect(host=db_params['host'], user=db_params['user'],
+    return pymysql.connect(host=db_params['host'], user=db_params['user'],
                            passwd=db_params['password'], db=db_name,
                            connect_timeout=0)
 
@@ -169,7 +169,7 @@ def loadlc(kic, use_pdc=True, long_cadence=True, from_db=True,
                     got_it = True
 
                 count += 1
-            except MySQLdb.OperationalError:
+            except pymysql.OperationalError:
                 print('mysqldb connection failed on attempt {0} of {1}.\n'
                       'Trying again.'.format(count + 1, 5))
                 count += 1
