@@ -69,7 +69,7 @@ class InspectorGadget(object):
             self.results = _create_results_file(merge)
 
             self.results.loc[:, 'p_orb_on_p_rot_1'] = self.results['period'] / \
-                                                      self.results['p_rot_1']
+                self.results['p_rot_1']
             self.results.sort_values(['p_orb_on_p_rot_1'], inplace=True)
             self.results.reset_index(inplace=True)
 

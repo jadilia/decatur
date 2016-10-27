@@ -193,8 +193,8 @@ class EclipsingBinary(object):
             median_flux = np.nanmedian(self.l_curve.fluxes[mask])
 
             # Subtract fit and median normalize
-            fluxes_detrended[mask] = (self.l_curve.fluxes[mask]
-                                      - z(self.l_curve.times[mask])) \
+            fluxes_detrended[mask] = (self.l_curve.fluxes[mask] -
+                                      z(self.l_curve.times[mask])) \
                 / median_flux
 
             flux_errs_normed[mask] = self.l_curve.flux_errs[mask] / median_flux
@@ -246,10 +246,10 @@ class EclipsingBinary(object):
 
         window /= 2
 
-        mask = ((phase > self.params.width_pri * window)
-                & (phase < 1 - self.params.width_pri * window)) \
-            & ((phase > self.params.sep + self.params.width_sec * window)
-               | (phase < self.params.sep - self.params.width_sec * window))
+        mask = ((phase > self.params.width_pri * window) &
+                (phase < 1 - self.params.width_pri * window)) & \
+            ((phase > self.params.sep + self.params.width_sec * window) |
+             (phase < self.params.sep - self.params.width_sec * window))
 
         fluxes_interp = np.copy(self.l_curve.fluxes)
         fluxes_interp[~mask] = np.interp(self.l_curve.times[~mask],
