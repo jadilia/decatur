@@ -84,7 +84,7 @@ def __dbconnect(db_name):
 
     return pymysql.connect(host=db_params['host'], user=db_params['user'],
                            passwd=db_params['password'], db=db_name,
-                           connect_timeout=0)
+                           connect_timeout=1)
 
 
 def loadlc(kic, use_pdc=True, long_cadence=True, from_db=True,
