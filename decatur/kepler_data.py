@@ -8,7 +8,9 @@ from __future__ import print_function, division, absolute_import
 
 
 import numpy as np
+import paramiko
 import pymysql
+import socket
 
 from . import exceptions
 from . import utils
@@ -140,39 +142,73 @@ def loadlc(kic, use_pdc=True, long_cadence=True, from_db=True,
         else:
             flux_str = 'sap_flux, sap_flux_err '
 
-        count = 0
-        got_it = False
-        # Try multiple times in case of sporadic database timeouts
-        while count < 5 and not got_it:
-            try:
-                db = __dbconnect(db_name)
-                cursor = db.cursor()
+        host_name = socket.gethostname()
+        # Check if local host is on same domain as database host
+        if db_params['domain'] in host_name:
+            count = 0
+            got_it = False
+            # Try multiple times in case of sporadic database timeouts
+            while count < 5 and not got_it:
+                try:
+                    db = __dbconnect(db_name)
+                    cursor = db.cursor()
 
-                to_ex = 'SELECT cadenceno, quarter, sap_quality, time, {} ' \
-                        'FROM {} WHERE keplerid = %s AND {};'\
-                    .format(flux_str, table_name, lc_flag)
+                    to_ex = 'SELECT cadenceno, quarter, sap_quality, time, {} ' \
+                            'FROM {} WHERE keplerid = %s AND {};'\
+                        .format(flux_str, table_name, lc_flag)
 
-                cursor.execute(to_ex, (int(kic),))
-                results = cursor.fetchall()
-                cadences = np.array([x[0] for x in results], dtype=np.int32)
-                quarters = np.array([x[1] for x in results], dtype=np.int32)
-                flags = np.array([x[2] for x in results], dtype=np.int32)
-                times = np.array([x[3] for x in results], dtype=np.float64)
-                fluxes = np.array([x[4] for x in results], dtype=np.float32)
-                flux_errs = np.array([x[5] for x in results], dtype=np.float32)
-                cursor.close()
-                db.close()
+                    cursor.execute(to_ex, (int(kic),))
+                    results = cursor.fetchall()
+                    cadences = np.array([x[0] for x in results], dtype=np.int32)
+                    quarters = np.array([x[1] for x in results], dtype=np.int32)
+                    flags = np.array([x[2] for x in results], dtype=np.int32)
+                    times = np.array([x[3] for x in results], dtype=np.float64)
+                    fluxes = np.array([x[4] for x in results], dtype=np.float32)
+                    flux_errs = np.array([x[5] for x in results], dtype=np.float32)
+                    cursor.close()
+                    db.close()
 
-                # For some reason some results are coming back with
-                # arrays of length 0.
-                if len(times) > 0:
-                    got_it = True
+                    # For some reason some results are coming back with
+                    # arrays of length 0.
+                    if len(times) > 0:
+                        got_it = True
 
-                count += 1
-            except pymysql.OperationalError:
-                print('mysqldb connection failed on attempt {0} of {1}.\n'
-                      'Trying again.'.format(count + 1, 5))
-                count += 1
+                    count += 1
+                except pymysql.OperationalError:
+                    print('mysqldb connection failed on attempt {0} of {1}.\n'
+                          'Trying again.'.format(count + 1, 5))
+                    count += 1
+        else:
+            # Run query through an SSH tunnel
+            query_str = "'SELECT cadenceno, quarter, sap_quality, time, {0} " \
+                        "FROM {3} " \
+                        "WHERE keplerid = {2} AND {1};'".format(flux_str, lc_flag, int(kic), table_name)
+
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(db_params['tunnel_host'], username=db_params['tunnel_user'])
+
+            command_str = 'mysql -h {} -u {} -D {} --password={} -e {}'\
+                .format(db_params['host'], db_params['user'], db_name,
+                        db_params['password'], query_str)
+
+            stdin, stdout, stderr = ssh.exec_command(command_str)
+            results = stdout.read().splitlines()
+            results = results[1:]
+
+            cadences = np.array([int(x.split('\t')[0]) for x in results],
+                                dtype=np.int32)
+            quarters = np.array([int(x.split('\t')[1]) for x in results],
+                                dtype=np.int32)
+            flags = np.array([int(x.split('\t')[2]) for x in results],
+                             dtype=np.int32)
+            times = np.array([float(x.split('\t')[3]) for x in results],
+                             dtype=np.float64)
+            fluxes = np.array([float(x.split('\t')[4]) for x in results],
+                              dtype=np.float32)
+            flux_errs = np.array([float(x.split('\t')[5]) for x in results],
+                                 dtype=np.float32)
+            ssh.close()
 
         # Guarantee the light curve is in sequential order
         # %timeit says that doing the ordering in Python is faster than

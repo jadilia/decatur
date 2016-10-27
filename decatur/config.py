@@ -14,4 +14,9 @@ if data_dir is None:
 host = os.getenv('DB_HOST')
 user = os.getenv('DB_USER')
 password = os.getenv('DB_PASSWORD')
-db_params = {'host': host, 'user': user, 'password': password}
+domain = os.getenv('DB_DOMAIN')
+tunnel_host = os.getenv('TUNNEL_HOST')
+tunnel_user = os.getenv('TUNNEL_USER')
+db_params = {'host': host, 'user': user, 'password': password,
+             'domain': domain, 'tunnel_host': tunnel_host,
+             'tunnel_user': tunnel_user}

@@ -1,3 +1,5 @@
+pymysql
+paramiko
 scipy
 h5py
 gatspy
