@@ -278,3 +278,48 @@ def phase_correlation(times, fluxes, p_fold, t_0=0., delta_phase=0.01,
         plt.show()
 
     return cycle_num, corr
+
+
+def correlation_at_p_orb(width_max=0.25, savefile=None):
+    """
+    Compute the cross correlation with the median light curve folded at the
+    orbital period.
+
+    Parameters
+    ----------
+    width_max : float, optional
+        Eclipses will be interpolated over if the primary phase width
+        is less than `width_max`.
+    savefile : str, optional
+        Specify an alternate output file.
+    """
+    kebc = utils.load_catalog()
+    kics = kebc['KIC']
+
+    correlations = np.zeros(len(kebc), dtype=float) - 1.
+
+    total_systems = len(kics)
+    print('Measuring rotation periods for {} systems...'.format(total_systems))
+
+    for ii, kic in enumerate(kics):
+
+        eb = eclipsing_binary.EclipsingBinary.from_kic(kic)
+        eb.detrend_and_normalize()
+
+        if eb.params.width_pri < width_max:
+            eb.interpolate_over_eclipse()
+
+        corr = phase_correlation(eb.l_curve.times, eb.l_curve.fluxes,
+                                 eb.params.p_orb, t_0=eb.params.bjd_0)[1]
+
+        correlations[ii] = np.nanmedian(corr)
+
+        sys.stdout.write('\r{:.1f}% complete'.format((ii + 1) * 100 / total_systems))
+        sys.stdout.flush()
+
+    print()
+
+    if savefile is None:
+        savefile = 'corr_at_p_orb.npy'
+
+    np.save('{}/{}'.format(data_dir, savefile), [kics, correlations])
