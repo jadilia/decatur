@@ -3,6 +3,8 @@
 
 from __future__ import print_function, division, absolute_import
 
+import warnings
+
 import numpy as np
 from gatspy.periodic import LombScargleFast
 
@@ -142,7 +144,12 @@ class EclipsingBinary(object):
 
         number_of_entries = np.sum(matching_kic)
 
-        if number_of_entries == 1:
+        if number_of_entries >= 1:
+
+            if number_of_entries > 1:
+                warnings.warn('Multiple catalog entries for KIC {}. '
+                              'Using first entry.'.format(kic))
+
             p_orb = df[matching_kic]['period'].values[0]
             bjd_0 = df[matching_kic]['bjd0'].values[0]
             depth_pri = df[matching_kic]['pdepth'].values[0]
@@ -158,13 +165,11 @@ class EclipsingBinary(object):
 
             return cls(light_curve, binary_params)
 
-        elif number_of_entries < 1:
+        else:
             print('No entries in EB catalog for KIC {}'.format(kic))
             print('Returning empty BinaryParameters object.')
             return cls(light_curve, BinaryParameters())
 
-        elif number_of_entries > 1:
-            raise CatalogMatchError('Multiple entries in catalog for KIC {}'.format(kic))
 
     def detrend_and_normalize(self, poly_order=3):
         """
