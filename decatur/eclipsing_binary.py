@@ -10,7 +10,6 @@ from gatspy.periodic import LombScargleFast
 
 from . import kepler_data
 from . import utils
-from .exceptions import CatalogMatchError
 
 
 class BinaryParameters(object):
@@ -169,7 +168,6 @@ class EclipsingBinary(object):
             print('No entries in EB catalog for KIC {}'.format(kic))
             print('Returning empty BinaryParameters object.')
             return cls(light_curve, BinaryParameters())
-
 
     def detrend_and_normalize(self, poly_order=3):
         """
