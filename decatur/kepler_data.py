@@ -6,7 +6,7 @@ Query the KEBC and load Kepler light curves.
 
 from __future__ import print_function, division, absolute_import
 
-
+import kplr
 import numpy as np
 import paramiko
 import pymysql
@@ -88,7 +88,7 @@ def __dbconnect(db_name):
 
 
 def loadlc(kic, use_pdc=True, long_cadence=True, from_db=True,
-           db_name='Kepler'):
+           db_name='Kepler', fetch=True):
     """
     Load Kepler data from a local database. Written by Ethan Kruse.
 
@@ -105,6 +105,8 @@ def loadlc(kic, use_pdc=True, long_cadence=True, from_db=True,
         Set to False to load data from MAST using the kplr package.
     db_name : str, optional
         Database name.
+    fetch : bool, optional
+        If `from_db` == False, set to `fetch == False` to not download data.
 
     Returns
     -------
@@ -125,8 +127,6 @@ def loadlc(kic, use_pdc=True, long_cadence=True, from_db=True,
     ------
     NoLightCurvesError
         If there are no light curves for the given KIC ID.
-    NotImplementedError
-        If `from_db` == False. Loading data from MAST is TODO.
 
     """
     if from_db:
@@ -210,21 +210,57 @@ def loadlc(kic, use_pdc=True, long_cadence=True, from_db=True,
                                  dtype=np.float32)
             ssh.close()
 
-        # Guarantee the light curve is in sequential order
-        # %timeit says that doing the ordering in Python is faster than
-        #  including an 'ORDER BY time' flag in the MySQL search.
-        # I have no idea why, but I'll keep doing the ordering here.
-        order = np.argsort(times)
-        times = times[order]
-        fluxes = fluxes[order]
-        flux_errs = flux_errs[order]
-        flags = flags[order]
-        cadences = cadences[order]
-        quarters = quarters[order]
-
-        if fluxes.size == 0:
-            raise exceptions.NoLightCurvesError('No light curves found for KIC {}'.format(kic))
     else:
-        raise NotImplementedError('Currently can only load light curves from database.')
+        client = kplr.API()
+
+        light_curves = client.light_curves(kepler_id=kic, fetch=fetch,
+                                           short_cadence=~long_cadence)
+
+        times, fluxes, flux_errs = [], [], []
+        flags, cadences, quarters = [], [], []
+
+        for lc in light_curves:
+            with lc.open() as ff:
+                hdu_data = ff[1].data
+
+                times = np.append(times, hdu_data["time"])
+                flags = np.append(flags, hdu_data["sap_quality"])
+                cadences = np.append(cadences, hdu_data["cadenceno"])
+
+                quarter = np.repeat(int(ff[0].header['quarter']),
+                                    len(hdu_data))
+                quarters = np.append(quarters, quarter)
+
+                if use_pdc:
+                    fluxes = np.append(fluxes, hdu_data["pdcsap_flux"])
+                    flux_errs = np.append(flux_errs,
+                                          hdu_data["pdcsap_flux_err"])
+                else:
+                    fluxes = np.append(fluxes, hdu_data["sap_flux"])
+                    flux_errs = np.append(flux_errs, hdu_data["sap_flux_err"])
+
+        # Remove NaNs
+        good_data = np.isfinite(fluxes)
+        times = times[good_data]
+        fluxes = fluxes[good_data]
+        flux_errs = flux_errs[good_data]
+        flags = flags[good_data]
+        cadences = cadences[good_data]
+        quarters = quarters[good_data]
+
+    if len(times) == 0:
+        raise exceptions.NoLightCurvesError('No light curves found for KIC {}'.format(kic))
+
+    # Guarantee the light curve is in sequential order
+    # %timeit says that doing the ordering in Python is faster than
+    #  including an 'ORDER BY time' flag in the MySQL search.
+    # I have no idea why, but I'll keep doing the ordering here.
+    order = np.argsort(times)
+    times = times[order]
+    fluxes = fluxes[order]
+    flux_errs = flux_errs[order]
+    flags = flags[order]
+    cadences = cadences[order]
+    quarters = quarters[order]
 
     return times, fluxes, flux_errs, cadences, quarters, flags
