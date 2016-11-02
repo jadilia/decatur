@@ -53,11 +53,15 @@ class InspectorGadget(object):
         Specify an alternate pickle file for the inspection results.
     catalog_file : str, optional
         Specify an alternate eclipsing binary catalog filename.
+    from_db : bool, optional
+        Set to False to load data from MAST instead of local database.
     """
     def __init__(self, p_rot_file, periodograms_file,
-                 results_file='inspect.pkl', catalog_file='kebc.csv'):
+                 results_file='inspect.pkl', catalog_file='kebc.csv',
+                 from_db=True):
         self.p_rot_file = p_rot_file
         self.catalog_file = catalog_file
+        self.from_db = from_db
 
         merge = utils.merge_catalogs(catalog_file, p_rot_file)
 
@@ -151,7 +155,8 @@ class InspectorGadget(object):
         kic = self.results['KIC'][index]
 
         eb = eclipsing_binary.EclipsingBinary.from_kic(kic,
-                                                       catalog_file=self.catalog_file)
+                                                       catalog_file=self.catalog_file,
+                                                       from_db=self.from_db)
         eb.detrend_and_normalize()
 
         self.light_curve.set_xdata(eb.l_curve.times)
