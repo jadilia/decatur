@@ -15,19 +15,21 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy import stats, interpolate
 
-from . import eclipsing_binary, kepler_data, exceptions, utils
+from . import eclipsing_binary, kepler_data, utils
 from .config import data_dir
 
 
-def compute_periodograms(width_max=0.25, period_min=0.01, period_max=100.,
-                         oversampling=2, output_file=None,
-                         catalog_file='kebc.csv'):
+def compute_periodicity(kind, width_max=0.25, period_min=0.01, period_max=100.,
+                        oversampling=2, output_file=None,
+                        catalog_file='kebc.csv', from_db=True):
     """
     Compute periodograms for the Kepler eclipsing binary sample and
     store as an HDF5 file.
 
     Parameters
     ----------
+    kind : {'periodogram', 'acf'}
+        The kind of periodicity metric to compute.
     width_max : float, optional
         Eclipses will be interpolated over if the primary phase width
         is less than `width_max`.
@@ -40,10 +42,21 @@ def compute_periodograms(width_max=0.25, period_min=0.01, period_max=100.,
         Specify an alternate output results filename.
     catalog_file : str, optional
         Specify an alternate eclipsing binary catalog filename.
+    from_db : bool, optional
+        Set to False to download data from MAST instead of local database.
     """
+    if kind == 'periodogram':
+        x_var_name = 'periods'
+        y_var_name = 'powers'
+    elif kind == 'acf':
+        x_var_name = 'lags'
+        y_var_name = 'acf'
+    else:
+        raise ValueError('Invalid choice of metric `kind`: {}'.format(kind))
+
     if output_file is None:
         today = '{:%Y%m%d}'.format(datetime.date.today())
-        output_file = 'periodograms.{}.h5'.format(today)
+        output_file = '{}s.{}.h5'.format(kind, today)
 
     kics = kepler_data.select_kics(catalog_file=catalog_file)
 
@@ -51,26 +64,31 @@ def compute_periodograms(width_max=0.25, period_min=0.01, period_max=100.,
     h5.attrs['width_max'] = width_max
 
     total_systems = len(kics)
-    print('Computing periodograms for {} systems...'.format(total_systems))
+    print('Computing {}s for {} systems...'.format(kind, total_systems))
 
     for ii, kic in enumerate(kics):
-        try:
-            eb = eclipsing_binary.EclipsingBinary.from_kic(kic)
-        except exceptions.CatalogMatchError:
-            continue
+        eb = eclipsing_binary.EclipsingBinary.from_kic(kic, from_db=from_db)
 
         eb.detrend_and_normalize()
 
         if eb.params.width_pri < width_max:
             eb.interpolate_over_eclipse()
 
-        eb.run_periodogram(oversampling=oversampling)
+        if kind == 'periodogram':
+            eb.run_periodogram(oversampling=oversampling)
+            keep = (eb.periods > period_min) & (eb.periods < period_max)
+            x_var = eb.periods[keep]
+            y_var = eb.powers[keep]
 
-        keep = (eb.periods > period_min) & (eb.periods < period_max)
+        elif kind == 'acf':
+            eb.run_acf()
+            keep = eb.lags < period_max
+            x_var = eb.lags[keep]
+            y_var = eb.acf[keep]
 
         group = h5.create_group(str(kic))
-        group.create_dataset('periods', data=eb.periods[keep])
-        group.create_dataset('powers', data=eb.powers[keep])
+        group.create_dataset(x_var_name, data=x_var)
+        group.create_dataset(y_var_name, data=y_var)
 
         sys.stdout.write('\r{:.1f}% complete'.format((ii + 1) * 100 / total_systems))
         sys.stdout.flush()

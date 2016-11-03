@@ -5,6 +5,7 @@ from __future__ import print_function, division, absolute_import
 
 import warnings
 
+import interpacf
 import numpy as np
 from gatspy.periodic import LombScargleFast
 
@@ -107,6 +108,10 @@ class EclipsingBinary(object):
 
         self.periods = None
         self.powers = None
+        self.lags = None
+        self.acf = None
+        self.peak_max = None
+        self.all_peaks = None
 
     @classmethod
     def from_kic(cls, kic, catalog_file='kebc.csv', use_pdc=True,
@@ -276,3 +281,14 @@ class EclipsingBinary(object):
                                       self.l_curve.flux_errs)
 
         self.periods, self.powers = model.periodogram_auto(oversampling=oversampling)
+
+    def run_acf(self):
+        """
+        Compute the autocorrelation function.
+        """
+        self.lags, self.acf = interpacf.interpolated_acf(self.l_curve.times,
+                                                         self.l_curve.fluxes,
+                                                         cadences=self.l_curve.cadences)
+
+        self.peak_max, self.all_peaks = interpacf.dominant_period(self.lags,
+                                                                  self.acf)
