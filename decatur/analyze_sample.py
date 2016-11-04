@@ -60,6 +60,9 @@ def compute_periodicity(kind, width_max=0.25, period_min=0.01, period_max=100.,
 
     kics = kepler_data.select_kics(catalog_file=catalog_file)
 
+    # Avoid analyzing the same system twice.
+    kics = np.unique(kics)
+
     h5 = h5py.File('{}/{}'.format(data_dir, output_file), 'w')
     h5.attrs['width_max'] = width_max
 
