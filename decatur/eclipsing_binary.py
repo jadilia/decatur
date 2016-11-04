@@ -290,5 +290,9 @@ class EclipsingBinary(object):
                                                          self.l_curve.fluxes,
                                                          cadences=self.l_curve.cadences)
 
+    def find_acf_peaks(self):
+        """
+        Find the peaks in the autocorrelation function.
+        """
         self.peak_max, self.all_peaks = interpacf.dominant_period(self.lags,
                                                                   self.acf)
