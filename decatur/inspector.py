@@ -8,6 +8,7 @@ from __future__ import print_function, division, absolute_import
 
 import os
 
+from builtins import input
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -191,13 +192,13 @@ class InspectorGadget(object):
         index : int
             Index of the system in the results DataFrame
         """
-        user_class = raw_input('\nType of out-of-eclipse variability: ').lower()
+        user_class = input('\nType of out-of-eclipse variability: ').lower()
         self.results.loc[index, 'class'] = str(user_class)
 
-        alternate_p_rot = raw_input('Alternate rotation period?: ').lower()
+        alternate_p_rot = input('Alternate rotation period?: ').lower()
 
         if alternate_p_rot == 'y':
-            user_p_rot = raw_input('Rotation period: ')
+            user_p_rot = input('Rotation period: ')
             self.results.loc[index, 'p_rot_alt'] = float(user_p_rot)
 
         self.results.to_pickle(self.results_file)
@@ -213,7 +214,7 @@ class InspectorGadget(object):
 
         while True:
 
-            user_input = raw_input('--> ').lower()
+            user_input = input('--> ').lower()
 
             if user_input == '':
                 continue
