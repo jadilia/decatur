@@ -20,7 +20,7 @@ from .config import data_dir
 
 
 def compute_periodicity(kind, width_max=0.25, period_min=0.01, period_max=100.,
-                        oversampling=2, output_file=None,
+                        window=1., oversampling=2, output_file=None,
                         catalog_file='kebc.csv', from_db=True):
     """
     Compute periodograms for the Kepler eclipsing binary sample and
@@ -35,6 +35,8 @@ def compute_periodicity(kind, width_max=0.25, period_min=0.01, period_max=100.,
         is less than `width_max`.
     period_min, period_max : float, optional
         Results will only contain `period_min` < period < `period_max`
+    window : float, optional
+        The width (in phase) to interpolate over the eclipses.
     oversampling : int, optional
         Oversampling factor for the periodogram. Greater oversampling
         will result in larger output files.
@@ -75,7 +77,7 @@ def compute_periodicity(kind, width_max=0.25, period_min=0.01, period_max=100.,
         eb.detrend_and_normalize()
 
         if eb.params.width_pri < width_max:
-            eb.interpolate_over_eclipse()
+            eb.interpolate_over_eclipse(window=window)
 
         if kind == 'periodogram':
             eb.run_periodogram(oversampling=oversampling)
