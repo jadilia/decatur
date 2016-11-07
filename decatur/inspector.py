@@ -54,12 +54,14 @@ class InspectorGadget(object):
         Specify an alternate pickle file for the inspection results.
     catalog_file : str, optional
         Specify an alternate eclipsing binary catalog filename.
+    sort_on : str, optional
+        Sort by a column in the KEBC. Must be a valid column name.
     from_db : bool, optional
         Set to False to load data from MAST instead of local database.
     """
     def __init__(self, p_rot_file, periodograms_file,
                  results_file='inspect.pkl', catalog_file='kebc.csv',
-                 from_db=True):
+                 sort_on='KIC', from_db=True):
         self.p_rot_file = p_rot_file
         self.catalog_file = catalog_file
         self.from_db = from_db
@@ -72,13 +74,9 @@ class InspectorGadget(object):
             self.results = pd.read_pickle(self.results_file)
         else:
             self.results = _create_results_file(merge)
-
-            self.results.loc[:, 'p_orb_on_p_rot_1'] = self.results['period'] / \
-                self.results['p_rot_1']
-            self.results.sort_values(['p_orb_on_p_rot_1'], inplace=True)
-            self.results.reset_index(inplace=True)
-
             self.results.to_pickle(self.results_file)
+
+        self.sort_indices = np.argsort(self.results[sort_on])
 
         # Load the periodograms
         self.h5 = h5py.File('{}/{}'.format(config.data_dir, periodograms_file))
@@ -210,9 +208,12 @@ class InspectorGadget(object):
         self._setup()
 
         ii = 0
-        self._update(ii)
+        index = self.sort_indices[ii]
+        self._update(index)
 
         while True:
+
+            index = self.sort_indices[ii]
 
             user_input = input('--> ').lower()
 
@@ -223,14 +224,14 @@ class InspectorGadget(object):
                     print('Reached end of catalog')
                 else:
                     ii += 1
-                    self._update(ii)
+                    self._update(index)
 
             elif user_input == 'p':
                 if ii - 1 < 0:
                     print('At beginning of catalog')
                 else:
                     ii -= 1
-                    self._update(ii)
+                    self._update(index)
 
             elif user_input == 'q':
                 break
@@ -238,15 +239,15 @@ class InspectorGadget(object):
             elif utils.is_int(user_input):
                 try:
                     index = np.where(int(user_input) == self.results['KIC'])[0][0]
-                    ii = index
+                    ii = np.where(self.sort_indices == index)[0][0]
                 except IndexError:
                     print('Invalid KIC')
                     continue
                 self._update(index)
 
             elif user_input == 'c':
-                self._classify(ii)
-                self._print_kic_stats(ii)
+                self._classify(index)
+                self._print_kic_stats(index)
 
             else:
                 print('Input not understood')
