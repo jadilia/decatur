@@ -213,8 +213,6 @@ class InspectorGadget(object):
 
         while True:
 
-            index = self.sort_indices[ii]
-
             user_input = input('--> ').lower()
 
             if user_input == '':
@@ -224,6 +222,7 @@ class InspectorGadget(object):
                     print('Reached end of catalog')
                 else:
                     ii += 1
+                    index = self.sort_indices[ii]
                     self._update(index)
 
             elif user_input == 'p':
@@ -231,6 +230,7 @@ class InspectorGadget(object):
                     print('At beginning of catalog')
                 else:
                     ii -= 1
+                    index = self.sort_indices[ii]
                     self._update(index)
 
             elif user_input == 'q':
