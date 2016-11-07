@@ -10,6 +10,7 @@ import sys
 import datetime
 
 import h5py
+import interpacf
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -346,3 +347,54 @@ def correlation_at_p_orb(width_max=0.25, savefile=None):
         savefile = 'corr_at_p_orb.npy'
 
     np.save('{}/{}'.format(data_dir, savefile), [kics, correlations])
+    
+
+def find_acf_peaks(acf_file, results_file=None):
+    """
+    Find peaks in the auto-correlation function (ACF).
+
+    Results are saved as a pandas DataFrame in a pickle file.
+
+    Parameters
+    ----------
+    acf_file : str
+        HDF5 file containing the ACFs.
+    results_file : str, optional
+        Specify an alternate output results filename.
+    """
+    h5 = h5py.File('{}/{}'.format(data_dir, acf_file), 'r')
+
+    kics = np.array(h5.keys(), dtype=np.int64)
+
+    dtypes = [('KIC', np.uint64), ('peak_1', np.float64),
+              ('peak_2', np.float64), ('peak_3', np.float64),
+              ('peak_4', np.float64), ('peak_max', np.float64)]
+    rec_array = np.recarray(len(kics), dtype=dtypes)
+
+    total_systems = len(kics)
+    print('Finding ACF peaks for {} systems...'.format(total_systems))
+
+    for ii, kic in enumerate(kics):
+
+        lags = h5['{}/lags'.format(kic)][:]
+        acf = h5['{}/acf'.format(kic)][:]
+
+        peak_max, peaks = interpacf.dominant_period(lags, acf)
+
+        rec_array[ii]['KIC'] = kic
+        rec_array[ii]['peak_max'] = peak_max
+
+        for jj in range(len(peaks))[:4]:
+            rec_array[ii]['peak_{}'.format(jj + 1)] = peaks[jj]
+
+        sys.stdout.write('\r{:.1f}% complete'.format((ii + 1) * 100 / total_systems))
+        sys.stdout.flush()
+
+    print()
+
+    if results_file is None:
+        today = '{:%Y%m%d}'.format(datetime.date.today())
+        results_file = 'acf_peaks.{}.pkl'.format(today)
+
+    df = pd.DataFrame(data=rec_array)
+    df.to_pickle('{}/{}'.format(data_dir, results_file))
