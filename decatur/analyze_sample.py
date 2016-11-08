@@ -202,6 +202,44 @@ def plot_prot_porb(p_rot_file, plot_file=None, catalog_file='kebc.csv'):
     plt.savefig('{}/{}'.format(data_dir, plot_file))
 
 
+def phase_folded_median(phase, fluxes, delta_phase):
+    """
+    Compute the phase-folded median light curve.
+
+    Parameters
+    ----------
+    phase : array_like
+        The phase of observations.
+    fluxes : array_like
+        Observed fluxes
+    delta_phase : float
+        The phase bin width.
+
+    Returns
+    -------
+    interp : scipy.interp1d object
+        Linear interpolation of the phase-folded light curve.
+    """
+    bins = np.arange(0., 1. + delta_phase, delta_phase)
+    binned_med, bin_edges = stats.binned_statistic(phase, fluxes,
+                                                   statistic="median",
+                                                   bins=bins)[:2]
+
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+
+    # Wrap around at the beginning and end of the binned light curve
+    # using the fact that f(phase) = f(phase + 1)
+    wrap = ([bin_centers[-1] - 1.], bin_centers, [1. + bin_centers[0]])
+    bin_centers = np.concatenate(wrap)
+    wrap = ([binned_med[-1]], binned_med, [binned_med[0]])
+    binned_med = np.concatenate(wrap)
+
+    # Linear interpolation of binned light curve.
+    interp = interpolate.interp1d(bin_centers, binned_med)
+
+    return interp
+
+
 def phase_correlation(times, fluxes, p_fold, t_0=0., delta_phase=0.01,
                       cad_min=3, plot=False):
     """
@@ -242,23 +280,7 @@ def phase_correlation(times, fluxes, p_fold, t_0=0., delta_phase=0.01,
     # Start at zero
     cycle -= cycle.min()
 
-    # Computed binned median
-    bins = np.arange(0., 1. + delta_phase, delta_phase)
-    binned_med, bin_edges = stats.binned_statistic(phase, fluxes,
-                                                   statistic="median",
-                                                   bins=bins)[:2]
-
-    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
-
-    # Wrap around at the beginning and end of the binned light curve
-    # using the fact that f(phase) = f(phase + 1)
-    wrap = ([bin_centers[-1] - 1.], bin_centers, [1. + bin_centers[0]])
-    bin_centers = np.concatenate(wrap)
-    wrap = ([binned_med[-1]], binned_med, [binned_med[0]])
-    binned_med = np.concatenate(wrap)
-
-    # Linear interpolation of binned light curve.
-    interp = interpolate.interp1d(bin_centers, binned_med)
+    interp = phase_folded_median(phase, fluxes, delta_phase)
 
     # Only use cycles with more cadences than `cad_min`.
     cycle_num = np.arange(cycle.max() + 1)[np.bincount(cycle) > cad_min]
