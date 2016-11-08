@@ -78,7 +78,11 @@ class InspectorGadget(object):
             self.results = _create_results_file(merge)
             self.results.to_pickle(self.results_file)
 
-        self.sort_indices = np.argsort(self.results[sort_on])
+        if sort_on[-2:] == '_r':
+            # Reverse sort
+            self.sort_indices = np.argsort(self.results[sort_on[:-2]].values)[::-1]
+        else:
+            self.sort_indices = np.argsort(self.results[sort_on].values)
 
         # Load the periodograms
         self.h5 = h5py.File('{}/{}'.format(config.data_dir, pgram_file))
