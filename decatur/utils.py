@@ -44,7 +44,7 @@ def load_catalog(catalog_file='kebc.csv'):
     return df
 
 
-def merge_catalogs(kebc_file, p_rot_file):
+def merge_catalogs(kebc_file, pgram_results, acf_results):
     """
     Merge the Kepler Eclipsing Binary Catalog (KEBC)
     and the rotation periods results
@@ -53,18 +53,22 @@ def merge_catalogs(kebc_file, p_rot_file):
     ----------
     kebc_file : str, optional
         Name of the CSV file containing the KEBC.
-    p_rot_file : str, optional
-        Name of the pickle file containing the rotation periods.
+    pgram_results : str
+        Pickle file containing the rotation periods from periodograms.
+    acf_results : str
+        Pickle file containing the rotation periods from ACFs.
 
     Returns
     -------
     merge : pandas DataFrame
         Merge results
     """
-    p_rot_cat = pd.read_pickle('{}/{}'.format(data_dir, p_rot_file))
+    pgram_cat = pd.read_pickle('{}/{}'.format(data_dir, pgram_results))
+    acf_cat = pd.read_pickle('{}/{}'.format(data_dir, acf_results))
+
     kebc = load_catalog(kebc_file)
 
-    merge = pd.merge(kebc, p_rot_cat, on='KIC')
+    merge = pd.merge(kebc, pgram_cat, on='KIC').merge(acf_cat, on='KIC')
 
     return merge
 

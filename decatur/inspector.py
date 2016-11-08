@@ -31,7 +31,8 @@ def _create_results_file(merge):
     results : pandas DataFrame
         Relevant columns for light curve inspection.
     """
-    results = merge.loc[:, ['KIC', 'period', 'p_rot_1', 'peak_power_1']]
+    results = merge.loc[:, ['KIC', 'period', 'p_rot_1', 'peak_power_1',
+                            'peak_1', 'peak_max']]
     results.loc[:, 'class'] = np.repeat('-1', len(results))
     results.loc[:, 'p_rot_alt'] = np.repeat([-1.], len(results))
 
@@ -46,9 +47,11 @@ class InspectorGadget(object):
 
     Parameters
     ----------
-    p_rot_file : str
-        Name of the pickle file containing the rotation periods.
-    periodograms_file : str
+    pgram_results : str
+        Pickle file containing the rotation periods from periodograms.
+    acf_results : str
+        Pickle file containing the rotation periods from ACFs.
+    pgram_file : str
         Name of the HDF5 file containing the periodograms.
     results_file : str
         Specify an alternate pickle file for the inspection results.
@@ -59,14 +62,13 @@ class InspectorGadget(object):
     from_db : bool, optional
         Set to False to load data from MAST instead of local database.
     """
-    def __init__(self, p_rot_file, periodograms_file,
+    def __init__(self, pgram_results, acf_results, pgram_file, acf_file,
                  results_file='inspect.pkl', catalog_file='kebc.csv',
                  sort_on='KIC', from_db=True):
-        self.p_rot_file = p_rot_file
         self.catalog_file = catalog_file
         self.from_db = from_db
 
-        merge = utils.merge_catalogs(catalog_file, p_rot_file)
+        merge = utils.merge_catalogs(catalog_file, pgram_results, acf_results)
 
         self.results_file = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                          'data', results_file))
@@ -79,7 +81,9 @@ class InspectorGadget(object):
         self.sort_indices = np.argsort(self.results[sort_on])
 
         # Load the periodograms
-        self.h5 = h5py.File('{}/{}'.format(config.data_dir, periodograms_file))
+        self.h5 = h5py.File('{}/{}'.format(config.data_dir, pgram_file))
+
+        self.h5_acf = h5py.File('{}/{}'.format(config.data_dir, acf_file))
 
         self.times = [0]
         self.fluxes = [0]
@@ -87,21 +91,32 @@ class InspectorGadget(object):
         self.periods = [0]
         self.powers = [0]
 
+        self.lags = [0]
+        self.acf = [0]
+
         self.fig = None
         self.ax1 = None
         self.ax2 = None
+        self.ax3 = None
         self.fig_number = None
 
         self.light_curve = None
         self.periodogram = None
-        self.p_rot_line = None
+        self.acf_plot = None
+
+        self.p_orb_line_2 = None
+        self.p_rot_line_2 = None
+        self.p_orb_line_3 = None
+        self.p_rot_line_3 = None
+        self.peak_1_line = None
 
     def _setup(self):
         """
         Setup the plot
         """
         plt.ion()
-        self.fig, (self.ax1, self.ax2) = plt.subplots(nrows=2, figsize=(7, 12))
+        self.fig, (self.ax1, self.ax2, self.ax3) = plt.subplots(nrows=3,
+                                                                figsize=(7, 12))
 
         # Use this later to check if the window has been closed.
         self.fig_number = self.fig.number
@@ -117,8 +132,21 @@ class InspectorGadget(object):
         self.ax2.set_xlabel('Period (days)')
         self.ax2.set_ylabel('Normalized Power')
 
-        # Vertical line at the measured rotation period
-        self.p_rot_line = self.ax2.axvline(0, color='b')
+        # Vertical lines at the measured rotation period and orbital period
+        self.p_rot_line_2 = self.ax2.axvline(0, color='r')
+        self.p_orb_line_2 = self.ax2.axvline(0, color='b')
+
+        # Setup the ACF plot
+        self.acf_plot, = self.ax3.plot(self.lags, self.acf, color='k')
+        self.ax3.set_xlim(0, 45)
+        self.ax3.set_ylim(-1, 1)
+        self.ax3.set_xlabel('Lag (days)')
+        self.ax3.set_ylabel('ACF')
+
+        # Vertical lines a orbital period, first peak, and highest peak
+        self.p_rot_line_3 = self.ax3.axvline(0, color='r')
+        self.peak_1_line = self.ax3.axvline(0, color='g')
+        self.p_orb_line_3 = self.ax3.axvline(0, color='b')
 
     def _print_kic_stats(self, index):
         """
@@ -175,7 +203,18 @@ class InspectorGadget(object):
         self.ax2.set_xlim(0, 45)
         self.ax2.set_ylim(0, 1.1 * powers.max())
 
-        self.p_rot_line.set_xdata(self.results['p_rot_1'][index])
+        self.p_rot_line_2.set_xdata(self.results['p_rot_1'][index])
+        self.p_orb_line_2.set_xdata(self.results['period'][index])
+
+        lags = self.h5_acf['{}/lags'.format(kic)][:]
+        acf = self.h5_acf['{}/acf'.format(kic)][:]
+        self.acf_plot.set_xdata(lags)
+        self.acf_plot.set_ydata(acf / acf.max())
+        self.ax3.set_xlim(0, 4 * self.results['period'][index])
+
+        self.peak_1_line.set_xdata(self.results['peak_1'][index])
+        self.p_rot_line_3.set_xdata(self.results['peak_max'][index])
+        self.p_orb_line_3.set_xdata(self.results['period'][index])
 
         self.fig.canvas.draw()
 
