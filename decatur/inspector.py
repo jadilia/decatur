@@ -80,9 +80,15 @@ class InspectorGadget(object):
 
         if sort_on[-2:] == '_r':
             # Reverse sort
-            self.sort_indices = np.argsort(self.results[sort_on[:-2]].values)[::-1]
+            sort_on = sort_on[:-2]
+            self.sort_indices = np.argsort(self.results[sort_on].values)[::-1]
         else:
             self.sort_indices = np.argsort(self.results[sort_on].values)
+
+        # Find the last classified light target
+        classified = self.results['class'] != '-1'
+        classified = self.results[sort_on][self.sort_indices][classified]
+        self.start_index = classified.index[-1]
 
         # Load the periodograms
         self.h5 = h5py.File('{}/{}'.format(config.data_dir, pgram_file))
@@ -250,9 +256,8 @@ class InspectorGadget(object):
         """
         self._setup()
 
-        ii = 0
-        index = self.sort_indices[ii]
-        self._update(index)
+        ii = np.where(self.sort_indices == self.start_index)[0][0]
+        self._update(self.start_index)
 
         while True:
 
