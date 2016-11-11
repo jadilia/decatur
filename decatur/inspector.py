@@ -61,12 +61,15 @@ class InspectorGadget(object):
         Sort by a column in the KEBC. Must be a valid column name.
     from_db : bool, optional
         Set to False to load data from MAST instead of local database.
+    zoom_pan : float, optional
+        Factor by which to zoom and pan light curve plot.
     """
     def __init__(self, pgram_results, acf_results, pgram_file, acf_file,
                  results_file='inspect.pkl', catalog_file='kebc.csv',
-                 sort_on='KIC', from_db=True):
+                 sort_on='KIC', from_db=True, zoom_pan=0.05):
         self.catalog_file = catalog_file
         self.from_db = from_db
+        self.zoom_pan = zoom_pan
 
         merge = utils.merge_catalogs(catalog_file, pgram_results, acf_results)
 
@@ -119,6 +122,8 @@ class InspectorGadget(object):
         self.p_orb_line_3 = None
         self.p_rot_line_3 = None
         self.peak_1_line = None
+
+        self.zoom_pan_axis = 1
 
     def _setup(self):
         """
@@ -189,6 +194,8 @@ class InspectorGadget(object):
         if not plt.fignum_exists(self.fig_number):
             self._setup()
 
+        self.zoom_pan_axis = 1
+
         kic = self.results['KIC'][index]
 
         eb = eclipsing_binary.EclipsingBinary.from_kic(kic,
@@ -250,11 +257,47 @@ class InspectorGadget(object):
 
         self.results.to_pickle(self.results_file)
 
+    def _key_press(self, event):
+        """
+        Handle zooming and panning.
+        """
+        # Change axis for zoom-pan.
+        if event.key in ['1', '2', '3']:
+            self.zoom_pan_axis = int(event.key)
+            return
+
+        ax = [self.ax1, self.ax2, self.ax3][self.zoom_pan_axis - 1]
+        x0, x1 = ax.get_xlim()
+        y0, y1 = ax.get_ylim()
+        x_width = x1 - x0
+        y_width = y1 - y0
+        zp = self.zoom_pan
+
+        if event.key == 'left':
+            ax.set_xlim(x0 - zp * x_width, x1 - zp * x_width)
+        elif event.key == 'right':
+            ax.set_xlim(x0 + zp * x_width, x1 + zp * x_width)
+        elif event.key == 'ctrl+left':
+            ax.set_xlim(x0 - zp * x_width, x1 + zp * x_width)
+        elif event.key == 'ctrl+right':
+            ax.set_xlim(x0 + zp * x_width, x1 - zp * x_width)
+
+        elif event.key == 'up':
+            ax.set_ylim(y0 + zp * y_width, y1 + zp * y_width)
+        elif event.key == 'down':
+            ax.set_ylim(y0 - zp * y_width, y1 - zp * y_width)
+        elif event.key == 'ctrl+up':
+            ax.set_ylim(y0 + zp * y_width, y1 - zp * y_width)
+        elif event.key == 'ctrl+down':
+            ax.set_ylim(y0 - zp * y_width, y1 + zp * y_width)
+
     def gogo_gadget(self):
         """
         Launch the inspection program.
         """
         self._setup()
+
+        self.fig.canvas.mpl_connect('key_press_event', self._key_press)
 
         ii = np.where(self.sort_indices == self.start_index)[0][0]
         self._update(self.start_index)
