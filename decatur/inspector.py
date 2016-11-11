@@ -63,13 +63,21 @@ class InspectorGadget(object):
         Set to False to load data from MAST instead of local database.
     zoom_pan : float, optional
         Factor by which to zoom and pan light curve plot.
+    pgram_on : bool, optional
+        Set to False to turn periodogram plot off.
+    acf_on : bool, optional
+        Set to False to turn ACF plot off.
     """
     def __init__(self, pgram_results, acf_results, pgram_file, acf_file,
                  results_file='inspect.pkl', catalog_file='kebc.csv',
-                 sort_on='KIC', from_db=True, zoom_pan=0.05):
+                 sort_on='KIC', from_db=True, zoom_pan=0.05, pgram_on=True,
+                 acf_on=True):
         self.catalog_file = catalog_file
         self.from_db = from_db
         self.zoom_pan = zoom_pan
+        self.pgram_on = pgram_on
+        self.acf_on = acf_on
+        self.subplot_list = ['1', '2', '3']
 
         merge = utils.merge_catalogs(catalog_file, pgram_results, acf_results)
 
@@ -130,9 +138,19 @@ class InspectorGadget(object):
         Setup the plot
         """
         plt.ion()
-        self.fig, (self.ax1, self.ax2, self.ax3) = plt.subplots(nrows=3,
-                                                                figsize=(7, 12))
 
+        if self.pgram_on and not self.acf_on:
+            self.fig, (self.ax1, self.ax2) = plt.subplots(nrows=2,
+                                                          figsize=(7, 12))
+        elif not self.pgram_on and self.acf_on:
+            self.fig, (self.ax1, self.ax3) = plt.subplots(nrows=2,
+                                                          figsize=(7, 12))
+        elif not self.pgram_on and not self.acf_on:
+            self.fig, self.ax1 = plt.subplots(nrows=1,
+                                              figsize=(7, 12))
+        else:
+            self.fig, (self.ax1, self.ax2, self.ax3) = plt.subplots(nrows=3,
+                                                                    figsize=(7, 12))
         # Use this later to check if the window has been closed.
         self.fig_number = self.fig.number
 
@@ -141,27 +159,34 @@ class InspectorGadget(object):
         self.ax1.set_xlabel('Time (days)')
         self.ax1.set_ylabel('Relative Flux')
 
-        # Set up the periodgram plot
-        self.periodogram, = self.ax2.plot(self.periods, self.powers, color='k')
-        self.ax2.set_xlim(0, 45)
-        self.ax2.set_xlabel('Period (days)')
-        self.ax2.set_ylabel('Normalized Power')
+        if self.pgram_on:
+            # Set up the periodgram plot
+            self.periodogram, = self.ax2.plot(self.periods, self.powers,
+                                              color='k')
+            self.ax2.set_xlim(0, 45)
+            self.ax2.set_xlabel('Period (days)')
+            self.ax2.set_ylabel('Normalized Power')
 
-        # Vertical lines at the measured rotation period and orbital period
-        self.p_rot_line_2 = self.ax2.axvline(0, color='r')
-        self.p_orb_line_2 = self.ax2.axvline(0, color='b')
+            # Vertical lines at the measured rotation period and orbital period
+            self.p_rot_line_2 = self.ax2.axvline(0, color='r')
+            self.p_orb_line_2 = self.ax2.axvline(0, color='b')
+        else:
+            self.subplot_list.remove('2')
 
-        # Setup the ACF plot
-        self.acf_plot, = self.ax3.plot(self.lags, self.acf, color='k')
-        self.ax3.set_xlim(0, 45)
-        self.ax3.set_ylim(-1, 1)
-        self.ax3.set_xlabel('Lag (days)')
-        self.ax3.set_ylabel('ACF')
+        if self.acf_on:
+            # Setup the ACF plot
+            self.acf_plot, = self.ax3.plot(self.lags, self.acf, color='k')
+            self.ax3.set_xlim(0, 45)
+            self.ax3.set_ylim(-1, 1)
+            self.ax3.set_xlabel('Lag (days)')
+            self.ax3.set_ylabel('ACF')
 
-        # Vertical lines a orbital period, first peak, and highest peak
-        self.p_rot_line_3 = self.ax3.axvline(0, color='r')
-        self.peak_1_line = self.ax3.axvline(0, color='g')
-        self.p_orb_line_3 = self.ax3.axvline(0, color='b')
+            # Vertical lines a orbital period, first peak, and highest peak
+            self.p_rot_line_3 = self.ax3.axvline(0, color='r')
+            self.peak_1_line = self.ax3.axvline(0, color='g')
+            self.p_orb_line_3 = self.ax3.axvline(0, color='b')
+        else:
+            self.subplot_list.remove('3')
 
     def _print_kic_stats(self, index):
         """
@@ -212,26 +237,28 @@ class InspectorGadget(object):
         flux_max = np.percentile(np.abs(eb.l_curve.fluxes), 98)
         self.ax1.set_ylim(-flux_max, flux_max)
 
-        periods = self.h5['{}/periods'.format(kic)][:]
-        powers = self.h5['{}/powers'.format(kic)][:]
-        self.periodogram.set_xdata(periods)
-        self.periodogram.set_ydata(powers)
+        if self.pgram_on:
+            periods = self.h5['{}/periods'.format(kic)][:]
+            powers = self.h5['{}/powers'.format(kic)][:]
+            self.periodogram.set_xdata(periods)
+            self.periodogram.set_ydata(powers)
 
-        self.ax2.set_xlim(0, 45)
-        self.ax2.set_ylim(0, 1.1 * powers.max())
+            self.ax2.set_xlim(0, 45)
+            self.ax2.set_ylim(0, 1.1 * powers.max())
 
-        self.p_rot_line_2.set_xdata(self.results['p_rot_1'][index])
-        self.p_orb_line_2.set_xdata(self.results['period'][index])
+            self.p_rot_line_2.set_xdata(self.results['p_rot_1'][index])
+            self.p_orb_line_2.set_xdata(self.results['period'][index])
 
-        lags = self.h5_acf['{}/lags'.format(kic)][:]
-        acf = self.h5_acf['{}/acf'.format(kic)][:]
-        self.acf_plot.set_xdata(lags)
-        self.acf_plot.set_ydata(acf / acf.max())
-        self.ax3.set_xlim(0, 4 * self.results['period'][index])
+        if self.acf_on:
+            lags = self.h5_acf['{}/lags'.format(kic)][:]
+            acf = self.h5_acf['{}/acf'.format(kic)][:]
+            self.acf_plot.set_xdata(lags)
+            self.acf_plot.set_ydata(acf / acf.max())
+            self.ax3.set_xlim(0, 4 * self.results['period'][index])
 
-        self.peak_1_line.set_xdata(self.results['peak_1'][index])
-        self.p_rot_line_3.set_xdata(self.results['peak_max'][index])
-        self.p_orb_line_3.set_xdata(self.results['period'][index])
+            self.peak_1_line.set_xdata(self.results['peak_1'][index])
+            self.p_rot_line_3.set_xdata(self.results['peak_max'][index])
+            self.p_orb_line_3.set_xdata(self.results['period'][index])
 
         self.fig.canvas.draw()
 
@@ -262,7 +289,7 @@ class InspectorGadget(object):
         Handle zooming and panning.
         """
         # Change axis for zoom-pan.
-        if event.key in ['1', '2', '3']:
+        if event.key in self.subplot_list:
             self.zoom_pan_axis = int(event.key)
             return
 
