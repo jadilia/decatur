@@ -98,8 +98,11 @@ class InspectorGadget(object):
 
         # Find the last classified light target
         classified = self.results['class'] != '-1'
-        classified = self.results[sort_on][self.sort_indices][classified]
-        self.start_index = classified.index[-1]
+        if np.sum(classified) == 0:
+            self.start_index = 0
+        else:
+            classified = self.results[sort_on][self.sort_indices][classified]
+            self.start_index = classified.index[-1]
 
         # Load the periodograms
         self.h5 = h5py.File('{}/{}'.format(config.data_dir, pgram_file))
