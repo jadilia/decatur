@@ -6,6 +6,7 @@ Analyze the eclipsing binary sample.
 
 from __future__ import print_function, division, absolute_import
 
+import os
 import sys
 import datetime
 
@@ -163,41 +164,57 @@ def measure_rotation_periods(periodograms_file, results_file=None,
     df.to_pickle('{}/{}'.format(data_dir, results_file))
 
 
-def plot_prot_porb(p_rot_file, plot_file=None, catalog_file='kebc.csv'):
+def plot_prot_porb(class_file, plot_file=None, catalog_file='kebc.csv'):
     """
     Plot P_orb / P_rot vs. P_orb.
 
     Parameters
     ----------
-    p_rot_file : str
-        Pickle file containing the rotation periods.
+    class_file : str
+        Pickle file containing the classifications and rotation periods.
     plot_file : str, optional
         Specify an alternate output plot file.
     catalog_file : str, optional
         Specify an alternate eclipsing binary catalog filename.
     """
-    df = pd.read_pickle('{}/{}'.format(data_dir, p_rot_file))
+    class_file = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                              'data', class_file))
+
+    df = pd.read_pickle(class_file)
     kebc = utils.load_catalog(catalog_file)
     join = pd.merge(kebc, df, on='KIC')
 
+    spot_mask = join['class'] == 'sp'
+    ev_mask = join['class'] == 'ev'
+
     fig, ax = plt.subplots()
 
-    scatter = ax.scatter(join['period'], join['period'] / join['p_rot_1'],
-                         c=join['peak_power_1'], cmap='viridis_r',
-                         vmin=0, vmax=1)
+    p_orb_p_rot = join['period_x'] / join['p_rot_1']
 
-    ax.set_xlim(0, 45)
+    colors = ['b', 'r']
+    labels = ['Ellipsoidals', 'Starspots']
+
+    for ii, mask in enumerate([ev_mask, spot_mask]):
+        ax.scatter(join['period_x'][mask], p_orb_p_rot[mask], color=colors[ii],
+                   s=5, label=labels[ii])
+
+    flat_mask = join['class'] == 'fl'
+    non_detections = np.repeat([5e-2], np.sum(flat_mask))
+    ax.scatter(join['period_x'][flat_mask], non_detections, color='g', s=5,
+               label='Non-detections')
+
+    ax.set_xscale('log')
+    ax.set_xlim(0.1, 100)
     ax.set_ylim(0, 3)
-    ax.set_xlabel('Orbital Period')
-    ax.set_ylabel('Orbital Period $\div$ Rotation Period')
+    ax.set_xlabel('$P_{orb}$ (days)')
+    ax.set_ylabel('$P_{orb}/P_{rot}$')
     ax.minorticks_on()
-
-    cbar = fig.colorbar(scatter)
-    cbar.ax.set_ylabel('Normalized Periodogram Power')
 
     if plot_file is None:
         today = '{:%Y%m%d}'.format(datetime.date.today())
         plot_file = 'rotation_periods.{}.pdf'.format(today)
+
+    ax.legend(loc='upper left', scatterpoints=1, markerscale=4)
 
     plt.savefig('{}/{}'.format(data_dir, plot_file))
 
