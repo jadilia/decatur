@@ -67,17 +67,20 @@ class InspectorGadget(object):
         Set to False to turn periodogram plot off.
     acf_on : bool, optional
         Set to False to turn ACF plot off.
+    use_pdc : bool, optional
+        Set to False to use SAP instead of PDC flux.
     """
     def __init__(self, pgram_results, acf_results, pgram_file, acf_file,
                  results_file='inspect.pkl', catalog_file='kebc.csv',
                  sort_on='KIC', from_db=True, zoom_pan=0.05, pgram_on=True,
-                 acf_on=True):
+                 acf_on=True, use_pdc=True):
         self.catalog_file = catalog_file
         self.from_db = from_db
         self.zoom_pan = zoom_pan
         self.pgram_on = pgram_on
         self.acf_on = acf_on
         self.subplot_list = ['1', '2', '3']
+        self.use_pdc = use_pdc
 
         merge = utils.merge_catalogs(catalog_file, pgram_results, acf_results)
 
@@ -228,7 +231,8 @@ class InspectorGadget(object):
 
         eb = eclipsing_binary.EclipsingBinary.from_kic(kic,
                                                        catalog_file=self.catalog_file,
-                                                       from_db=self.from_db)
+                                                       from_db=self.from_db,
+                                                       use_pdc=self.use_pdc)
         eb.detrend_and_normalize()
 
         self.light_curve.set_xdata(eb.l_curve.times)
