@@ -6,6 +6,7 @@ from __future__ import print_function, division, absolute_import
 import warnings
 
 import interpacf
+import matplotlib.pyplot as plt
 import numpy as np
 from gatspy.periodic import LombScargleFast
 
@@ -296,3 +297,20 @@ class EclipsingBinary(object):
         """
         self.peak_max, self.all_peaks = interpacf.dominant_period(self.lags,
                                                                   self.acf)
+    def phase_evolution_plot(self, t_min = 0, t_max = 10000):
+        """
+        Phase folded light curve color coded by time.
+        """
+        self.detrend_and_normalize()
+        phase = self.phase_fold()
+        mask = (self.l_curve.times > t_min) & (self.l_curve.times < t_max)
+        phase = phase[mask]
+        fluxes = self.l_curve.fluxes[mask]
+        times = self.l_curve.times[mask]
+
+        plt.scatter(phase, fluxes, s = 1, c = times, edgecolors = "None", cmap = "viridis")
+        plt.xlabel('Phase')
+        plt.ylabel('Relative Flux')
+        cbar = plt.colorbar()
+        cbar.ax.set_ylabel('Days')
+        plt.show()
