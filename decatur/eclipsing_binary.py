@@ -297,12 +297,14 @@ class EclipsingBinary(object):
         """
         self.peak_max, self.all_peaks = interpacf.dominant_period(self.lags,
                                                                   self.acf)
-    def phase_evolution_plot(self, t_min = 0, t_max = 10000):
+    def phase_evolution_plot(self, t_min = 0, t_max = 10000, period_fold = None):
         """
         Phase folded light curve color coded by time.
         """
+        if period_fold is None:
+            period_fold = self.params.p_orb
         self.detrend_and_normalize()
-        phase = self.phase_fold()
+        phase = self.phase_fold(period_fold = period_fold)
         mask = (self.l_curve.times > t_min) & (self.l_curve.times < t_max)
         phase = phase[mask]
         fluxes = self.l_curve.fluxes[mask]
