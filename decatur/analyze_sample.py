@@ -163,45 +163,6 @@ def measure_rotation_periods(periodograms_file, results_file=None,
     df.to_pickle('{}/{}'.format(data_dir, results_file))
 
 
-def plot_prot_porb(p_rot_file, plot_file=None, catalog_file='kebc.csv'):
-    """
-    Plot P_orb / P_rot vs. P_orb.
-
-    Parameters
-    ----------
-    p_rot_file : str
-        Pickle file containing the rotation periods.
-    plot_file : str, optional
-        Specify an alternate output plot file.
-    catalog_file : str, optional
-        Specify an alternate eclipsing binary catalog filename.
-    """
-    df = pd.read_pickle('{}/{}'.format(data_dir, p_rot_file))
-    kebc = utils.load_catalog(catalog_file)
-    join = pd.merge(kebc, df, on='KIC')
-
-    fig, ax = plt.subplots()
-
-    scatter = ax.scatter(join['period'], join['period'] / join['p_rot_1'],
-                         c=join['peak_power_1'], cmap='viridis_r',
-                         vmin=0, vmax=1)
-
-    ax.set_xlim(0, 45)
-    ax.set_ylim(0, 3)
-    ax.set_xlabel('Orbital Period')
-    ax.set_ylabel('Orbital Period $\div$ Rotation Period')
-    ax.minorticks_on()
-
-    cbar = fig.colorbar(scatter)
-    cbar.ax.set_ylabel('Normalized Periodogram Power')
-
-    if plot_file is None:
-        today = '{:%Y%m%d}'.format(datetime.date.today())
-        plot_file = 'rotation_periods.{}.pdf'.format(today)
-
-    plt.savefig('{}/{}'.format(data_dir, plot_file))
-
-
 def phase_folded_median(phase, fluxes, delta_phase):
     """
     Compute the phase-folded median light curve.
