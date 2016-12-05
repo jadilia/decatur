@@ -395,3 +395,56 @@ class EclipsingBinary(object):
                                       interval=100, repeat=True,
                                       init_func=init)
         plt.show()
+
+    def eclipse_snr(self, cad_min=3):
+        """
+        Compute the eclipse signal-to-noise ratio.
+
+        Parameters
+        ----------
+        period_fold : float, optional
+            Specify a different period at which to fold.
+        cad_min: int, optional
+            Exclude light curve sections with fewer cadences than `cad_min`
+
+        """
+        # Calculate the phase.
+        phase = self.phase_fold()
+        # Calculate the cycle number.
+        cycle = ((self.l_curve.times - self.params.bjd_0) //
+                 self.params.p_orb).astype(int)
+        # Start at zero
+        cycle -= cycle.min()
+
+        # Only use cycles with more cadences than `cad_min`.
+        cycle_num = np.arange(cycle.max() + 1)[np.bincount(cycle) > cad_min]
+
+        dp = self.params.width_pri * 1.5
+        phase_bins = [0.5 - 1.5 * dp, 0.5 - 0.5 * dp, 0.5 + 0.5 * dp,
+                      0.5 + 1.5 * dp]
+
+        # phase_grid = np.linspace(phase_bins[0], phase_bins[3])
+
+        for ii, nn in enumerate(cycle_num):
+
+            mask = cycle == nn
+
+            p = phase[mask]
+            f = self.l_curve.fluxes[mask]
+
+            digitized = np.digitize(p, phase_bins)
+            to_fit = (digitized == 1) | (digitized == 3)
+
+            poly = np.polyfit(p[to_fit], f[to_fit], 3)
+            fit = np.poly1d(poly)
+
+            # plt.scatter(p, f, c=digitized, edgecolors='None', cmap='viridis')
+            # plt.plot(p[digitized == 1], f[digitized == 1], color='k')
+            # plt.plot(p[digitized == 3], f[digitized == 3], color='k')
+            # plt.plot(phase_grid, fit(phase_grid))
+            # plt.xlim(0, 1)
+
+            # for bin in phase_bins:
+            #     plt.axvline(bin)
+            #
+            # plt.show()
