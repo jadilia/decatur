@@ -7,6 +7,7 @@ import warnings
 
 import interpacf
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import numpy as np
 from gatspy.periodic import LombScargleFast
 
@@ -321,4 +322,76 @@ class EclipsingBinary(object):
         plt.ylabel('Relative Flux')
         cbar = plt.colorbar()
         cbar.ax.set_ylabel('Days')
+        plt.show()
+
+    def phase_fold_animation(self, period_fold=None, cad_min=3):
+        """
+        Animate phase-folded light curve versus time.
+
+        Parameters
+        ----------
+        period_fold : float, optional
+            Specify a different period at which to fold.
+        cad_min: int, optional
+            Exclude light curve sections with fewer cadences than `cad_min`.
+        """
+        # Calculate the phase.
+        if period_fold is None:
+            period_fold = self.params.p_orb
+        phase = self.phase_fold(period_fold=period_fold)
+        # Calculate the cycle number.
+        cycle = ((self.l_curve.times - self.params.bjd_0) //
+                 self.params.p_orb).astype(int)
+        # Start at zero
+        cycle -= cycle.min()
+
+        # Only use cycles with more cadences than `cad_min`.
+        cycle_num = np.arange(cycle.max() + 1)[np.bincount(cycle) > cad_min]
+
+        def data_gen():
+            for ii, nn in enumerate(cycle_num):
+
+                mask = np.abs(cycle - nn) <= 0
+
+                phase_section = phase[mask]
+                flux_section = self.l_curve.fluxes[mask]
+
+                phase_sort = np.argsort(phase_section)
+
+                yield phase_section[phase_sort], flux_section[phase_sort]
+
+        def init():
+            lt_zero = -self.l_curve.fluxes[self.l_curve.fluxes < 0]
+            flux_min = -1.1 * np.percentile(lt_zero, 99)
+            gt_zero = self.l_curve.fluxes[self.l_curve.fluxes > 0]
+            flux_max = 1.1 * np.percentile(gt_zero, 99)
+            ax.set_ylim(flux_min, flux_max)
+            ax.set_xlim(-0.1, 1.1)
+            ax.set_xlabel('Phase')
+            ax.set_ylabel('Relative Flux')
+
+            del xdata[:]
+            del ydata[:]
+
+            line.set_data(xdata, ydata)
+
+            return line,
+
+        fig, ax = plt.subplots()
+        line, = ax.plot([], [], color='k', lw=1)
+        xdata, ydata = [], []
+
+        def run(data):
+            # update the data
+            t, y = data
+            xdata = t
+            ydata = y
+
+            line.set_data(xdata, ydata)
+
+            return line,
+
+        ani = animation.FuncAnimation(fig, run, data_gen, blit=False,
+                                      interval=100, repeat=True,
+                                      init_func=init)
         plt.show()
