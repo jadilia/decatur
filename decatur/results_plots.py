@@ -139,3 +139,60 @@ def synchronization_histogram(class_file, dy=0.025, plot_file=None,
     fig.subplots_adjust(hspace=0.1)
 
     plt.savefig('{}/{}'.format(data_dir, plot_file))
+
+
+def classification_metric(class_file, metric_file, metric1='pwidth',
+                          metric2='corr', plot_file=None):
+    """
+    Make a scatter plot of the classification metrics color-code by class.
+
+    Parameters
+    ----------
+    class_file : str
+        Pickle file containing the classifications and rotation periods.
+    metric_file : str
+        CSV file containing the classification `metric1`.
+    metric1, metric2 : str, optional
+        The metrics to use.
+    plot_file : str, optional
+        Specify an alternate output plot file.
+    """
+    class_df = get_classification_results(class_file, 'kebc.csv')
+    df = pd.read_csv('{}/{}'.format(data_dir, metric_file), dtype={'KIC': int})
+
+    merge = pd.merge(class_df, df, on='KIC')
+
+    # TODO: Deal with NaNs
+    xx = merge[metric1].values
+    xx[~np.isfinite(xx)] = -2
+
+    yy = merge[metric2].values
+    yy[~np.isfinite(yy)] = -2
+
+    eb_class = merge['class'].values
+
+    ev_mask = eb_class == 'ev'
+    sp_mask = eb_class == 'sp'
+    other_mask = ~ev_mask & ~sp_mask
+
+    fig, ax = plt.subplots()
+    ax.scatter(xx[other_mask], yy[other_mask], facecolors='grey',
+               edgecolors='None', label='Other')
+    ax.scatter(xx[ev_mask], yy[ev_mask], facecolors='b', edgecolors='None',
+               label='EV')
+    ax.scatter(xx[sp_mask], yy[sp_mask], facecolors='r', edgecolors='None',
+               label='SP')
+
+    ax.set_xlim(-0.01, 0.35)
+    ax.set_ylim(-0.1, 1.1)
+    ax.set_xlabel('Primary Eclipse Width (Phase)')
+    ax.set_ylabel('Median Phase-folded Correlation')
+    ax.minorticks_on()
+
+    ax.legend(loc='lower right', scatterpoints=1, markerscale=4)
+
+    if plot_file is None:
+        today = '{:%Y%m%d}'.format(datetime.date.today())
+        plot_file = 'class_metric.{}.pdf'.format(today)
+
+    plt.savefig('{}/{}'.format(data_dir, plot_file))
