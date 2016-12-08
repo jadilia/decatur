@@ -306,7 +306,7 @@ def correlation_at_p_orb(width_max=0.25, savefile=None):
     correlations = np.zeros(len(kebc), dtype=float) - 1.
 
     total_systems = len(kics)
-    print('Measuring rotation periods for {} systems...'.format(total_systems))
+    print('Measuring phase correlation for {} systems...'.format(total_systems))
 
     for ii, kic in enumerate(kics):
 
@@ -327,10 +327,15 @@ def correlation_at_p_orb(width_max=0.25, savefile=None):
     print()
 
     if savefile is None:
-        savefile = 'corr_at_p_orb.npy'
+        savefile = 'corr_at_p_orb.csv'
 
-    np.save('{}/{}'.format(data_dir, savefile), [kics, correlations])
-    
+    dtypes = [('KIC', np.uint64), ('corr', np.float32)]
+    rec_array = np.recarray(len(kics), dtype=dtypes)
+    rec_array['KIC'] = kics
+    rec_array['corr'] = correlations
+
+    df = pd.DataFrame(rec_array)
+    df.to_csv('{}/{}'.format(data_dir, savefile))
 
 def find_acf_peaks(acf_file, results_file=None):
     """
