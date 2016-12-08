@@ -67,13 +67,15 @@ class InspectorGadget(object):
         Set to False to turn periodogram plot off.
     acf_on : bool, optional
         Set to False to turn ACF plot off.
+    phase_fold_on : bool, optional
+        Set to True to show window with phase_folded light curve.
     use_pdc : bool, optional
         Set to False to use SAP instead of PDC flux.
     """
     def __init__(self, pgram_results, acf_results, pgram_file, acf_file,
                  results_file='inspect.pkl', catalog_file='kebc.csv',
                  sort_on='KIC', from_db=True, zoom_pan=0.05, pgram_on=True,
-                 acf_on=True, use_pdc=True):
+                 acf_on=True, phase_fold_on=False, use_pdc=True):
         self.catalog_file = catalog_file
         self.from_db = from_db
         self.zoom_pan = zoom_pan
@@ -81,6 +83,7 @@ class InspectorGadget(object):
         self.acf_on = acf_on
         self.subplot_list = ['1', '2', '3']
         self.use_pdc = use_pdc
+        self.phase_fold_on = phase_fold_on
 
         merge = utils.merge_catalogs(catalog_file, pgram_results, acf_results)
 
@@ -122,9 +125,11 @@ class InspectorGadget(object):
         self.acf = [0]
 
         self.fig = None
+        self.fig2 = None
         self.ax1 = None
         self.ax2 = None
         self.ax3 = None
+        self.ax4 = None
         self.fig_number = None
 
         self.light_curve = None
@@ -157,6 +162,14 @@ class InspectorGadget(object):
         else:
             self.fig, (self.ax1, self.ax2, self.ax3) = plt.subplots(nrows=3,
                                                                     figsize=(7, 12))
+
+        if self.phase_fold_on:
+            self.fig2, self.ax4 = plt.subplots()
+            self.phase_fold_plot = self.ax4.scatter([0], [0], color='k', s=0.1)
+            self.ax4.set_xlim(-0.1, 1.1)
+            self.ax4.set_xlabel('Phase')
+            self.ax4.set_ylabel('Relative Flux')
+
         # Use this later to check if the window has been closed.
         self.fig_number = self.fig.number
 
@@ -266,6 +279,16 @@ class InspectorGadget(object):
             self.peak_1_line.set_xdata(self.results['peak_1'][index])
             self.p_rot_line_3.set_xdata(self.results['peak_max'][index])
             self.p_orb_line_3.set_xdata(self.results['period'][index])
+
+        if self.phase_fold_on:
+            phase = eb.phase_fold()
+
+            self.phase_fold_plot.set_offsets(np.hstack((phase[:, None],
+                                                        eb.l_curve.fluxes[:, None])))
+            ymin = -1.1 * np.percentile(-eb.l_curve.fluxes[eb.l_curve.fluxes < 0], 99)
+            ymax = 1.5 * np.percentile(eb.l_curve.fluxes[eb.l_curve.fluxes > 0], 99)
+
+            self.ax4.set_ylim(ymin, ymax)
 
         self.fig.canvas.draw()
 
