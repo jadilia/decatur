@@ -59,6 +59,8 @@ class InspectorGadget(object):
         Specify an alternate eclipsing binary catalog filename.
     sort_on : str, optional
         Sort by a column in the KEBC. Must be a valid column name.
+    class_filter : str, optional
+        If not None, only light curves of this class will be shown.
     from_db : bool, optional
         Set to False to load data from MAST instead of local database.
     zoom_pan : float, optional
@@ -74,8 +76,9 @@ class InspectorGadget(object):
     """
     def __init__(self, pgram_results, acf_results, pgram_file, acf_file,
                  results_file='inspect.pkl', catalog_file='kebc.csv',
-                 sort_on='KIC', from_db=True, zoom_pan=0.05, pgram_on=True,
-                 acf_on=True, phase_fold_on=False, use_pdc=True):
+                 sort_on='KIC', class_filter=None, from_db=True, zoom_pan=0.05,
+                 pgram_on=True, acf_on=True, phase_fold_on=False,
+                 use_pdc=True):
         self.catalog_file = catalog_file
         self.from_db = from_db
         self.zoom_pan = zoom_pan
@@ -95,17 +98,24 @@ class InspectorGadget(object):
             self.results = _create_results_file(merge)
             self.results.to_pickle(self.results_file)
 
+        if class_filter is not None:
+            to_sort = self.results[self.results['class'] == class_filter]
+        else:
+            to_sort = self.results
+
         if sort_on[-2:] == '_r':
             # Reverse sort
             sort_on = sort_on[:-2]
-            self.sort_indices = np.argsort(self.results[sort_on].values)[::-1]
+            self.sort_indices = to_sort.sort_values(sort_on, ascending=False).index.values
         else:
-            self.sort_indices = np.argsort(self.results[sort_on].values)
+            self.sort_indices = to_sort.sort_values(sort_on, ascending=True).index.values
 
         # Find the last classified light target
-        classified = self.results['class'] != '-1'
+        classified = to_sort['class'] != '-1'
         if np.sum(classified) == 0:
             self.start_index = 0
+        elif class_filter is not None:
+            self.start_index = self.sort_indices[0]
         else:
             classified = self.results[sort_on][self.sort_indices][classified]
             self.start_index = classified.index[-1]
@@ -359,6 +369,8 @@ class InspectorGadget(object):
         ii = np.where(self.sort_indices == self.start_index)[0][0]
         self._update(self.start_index)
 
+        total_systems = len(self.sort_indices)
+
         while True:
 
             user_input = input('--> ').lower()
@@ -366,7 +378,7 @@ class InspectorGadget(object):
             if user_input == '':
                 continue
             elif user_input == 'n':
-                if ii + 2 > len(self.results['KIC']):
+                if ii + 2 > total_systems:
                     print('Reached end of catalog')
                 else:
                     ii += 1
