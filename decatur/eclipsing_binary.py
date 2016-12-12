@@ -114,6 +114,7 @@ class EclipsingBinary(object):
         self.acf = None
         self.peak_max = None
         self.all_peaks = None
+        self.peak_height = None
 
     @classmethod
     def from_kic(cls, kic, catalog_file='kebc.csv', use_pdc=True,
@@ -296,8 +297,8 @@ class EclipsingBinary(object):
         """
         Find the peaks in the autocorrelation function.
         """
-        self.peak_max, self.all_peaks = interpacf.dominant_period(self.lags,
-                                                                  self.acf)
+        returns = interpacf.dominant_period(self.lags, self.acf)
+        self.peak_max, self.all_peaks, self.peak_height = returns
 
     def phase_evolution_plot(self, t_min=0., t_max=10000.):
         """

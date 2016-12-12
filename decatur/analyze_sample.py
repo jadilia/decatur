@@ -337,6 +337,7 @@ def correlation_at_p_orb(width_max=0.25, savefile=None):
     df = pd.DataFrame(rec_array)
     df.to_csv('{}/{}'.format(data_dir, savefile))
 
+
 def find_acf_peaks(acf_file, results_file=None):
     """
     Find peaks in the auto-correlation function (ACF).
@@ -356,7 +357,8 @@ def find_acf_peaks(acf_file, results_file=None):
 
     dtypes = [('KIC', np.uint64), ('peak_1', np.float64),
               ('peak_2', np.float64), ('peak_3', np.float64),
-              ('peak_4', np.float64), ('peak_max', np.float64)]
+              ('peak_4', np.float64), ('peak_max', np.float64),
+              ('max_height', np.float64)]
     rec_array = np.recarray(len(kics), dtype=dtypes)
 
     total_systems = len(kics)
@@ -367,10 +369,11 @@ def find_acf_peaks(acf_file, results_file=None):
         lags = h5['{}/lags'.format(kic)][:]
         acf = h5['{}/acf'.format(kic)][:]
 
-        peak_max, peaks = interpacf.dominant_period(lags, acf)
+        peak_max, peaks, h_p = interpacf.dominant_period(lags, acf)
 
         rec_array[ii]['KIC'] = kic
         rec_array[ii]['peak_max'] = peak_max
+        rec_array[ii]['max_height'] = h_p
 
         for jj in range(len(peaks))[:4]:
             rec_array[ii]['peak_{}'.format(jj + 1)] = peaks[jj]
