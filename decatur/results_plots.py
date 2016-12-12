@@ -196,3 +196,34 @@ def classification_metric(class_file, metric_file, metric1='pwidth',
         plot_file = 'class_metric.{}.pdf'.format(today)
 
     plt.savefig('{}/{}'.format(data_dir, plot_file))
+
+
+def sync_vs_e_cos_w(class_file):
+    """
+    Plot P_orb / P_rot vs an approximate value for e cos(omega)
+
+    Parameters
+    ----------
+    class_file : str
+        Pickle file containing the classifications and rotation periods.
+    """
+    df = get_classification_results(class_file, 'kebc.csv')
+
+    fig, ax = plt.subplots()
+
+    df_sp = df[df['class'] == 'sp']
+
+    p_orb_p_rot = df_sp['period_x'] / df_sp['p_rot_1']
+
+    e_cos_w = np.pi / 2 * (df_sp['sep'] - 0.5)
+
+    ax.scatter(np.abs(e_cos_w), p_orb_p_rot, facecolors='r', edgecolors='None',
+               s=15)
+
+    ax.set_xlabel('$|e\cos{\omega}|$')
+    ax.set_ylabel('$P_{orb}/P_{rot}$')
+    ax.minorticks_on()
+    ax.set_xlim(-0.01, 0.8)
+    ax.set_ylim(0, 3)
+
+    plt.savefig('{}/sync_vs_e_cos_w.pdf'.format(data_dir))
