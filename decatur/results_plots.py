@@ -227,3 +227,69 @@ def sync_vs_e_cos_w(class_file):
     ax.set_ylim(0, 3)
 
     plt.savefig('{}/sync_vs_e_cos_w.pdf'.format(data_dir))
+
+
+def sync_vs_t_eff(class_file, source='kic'):
+    """
+    Plot P_orb / P_rot and P_orb vs T_eff.
+
+    Parameters
+    ----------
+    class_file : str
+        Pickle file containing the classifications and rotation period
+    source : {'kic', 'pin', 'cas', 'arm'}
+        Source of the effective temperatures.
+        KIC, Pinsonneault (2012), Casagrande (2010), Armstrong (2014)
+    """
+    df = get_classification_results(class_file, 'kebc.csv')
+
+    datafile = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                            'data/armstrong14.tsv'))
+
+    arm14 = pd.read_csv(datafile, delim_whitespace=True)
+
+    merge = pd.merge(df, arm14, on='KIC')
+
+    df_sp = merge[merge['class'] == 'sp']
+    df_ev = merge[merge['class'] == 'ev']
+
+    t_eff_columns = {'kic': 'Teff', 'pin': 'Teff(Pinsonneault)',
+                     'cas': 'Teff(Casagrande)', 'arm': 'T1'}
+
+    # Plot P_orb / P_rot vs. T_eff
+    fig, ax1 = plt.subplots()
+
+    ax1.scatter(df_sp[t_eff_columns[source]],
+                df_sp['period_x'] / df_sp['p_rot_1'], facecolors='r',
+                edgecolors='None', alpha=0.6, s=10, label='SP')
+
+    ax1.scatter(df_ev[t_eff_columns[source]],
+                df_ev['period_x'] / df_ev['p_rot_1'], facecolors='b',
+                alpha=0.6, edgecolors='None', s=10, label='EV')
+
+    ax1.set_xlabel('$T_{eff}$ (K)')
+    ax1.set_ylabel('$P_{orb}/P_{rot}$')
+    ax1.minorticks_on()
+    ax1.set_xlim(3000, 8000)
+    ax1.set_ylim(0, 3)
+    ax1.legend(loc='upper right', scatterpoints=1, markerscale=4)
+
+    fig.savefig('{}/sync-t_eff.pdf'.format(data_dir))
+
+    # Plot period vs. T_eff
+    fig2, ax2 = plt.subplots()
+
+    ax2.scatter(df_ev[t_eff_columns[source]], df_ev['period_x'], color='b',
+                s=10, alpha=0.6, label='EV', edgecolors='None')
+    ax2.scatter(df_sp[t_eff_columns[source]], df_sp['period_x'], color='r',
+                s=10, alpha=0.6, label='SP', edgecolors='None')
+
+    ax2.set_xlabel('$T_{eff}$ (K)')
+    ax2.set_ylabel('$P_{orb}$ (days)')
+    ax2.minorticks_on()
+    ax2.set_xlim(3000, 10000)
+    ax2.set_ylim(1e-1, 1e3)
+    ax2.set_yscale('log')
+    ax2.legend(loc='upper right', scatterpoints=1, markerscale=4)
+
+    fig2.savefig('{}/p_orb-t_eff.pdf'.format(data_dir))
