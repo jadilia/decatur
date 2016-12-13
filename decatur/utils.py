@@ -82,3 +82,17 @@ def is_int(string):
         return True
     except ValueError:
         return False
+
+
+def get_classification_results(class_file, catalog_file):
+    """
+    Get the classification results file.
+    """
+    class_file = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                              'data', class_file))
+
+    df = pd.read_pickle(class_file)
+    kebc = load_catalog(catalog_file)
+    class_df = pd.merge(kebc, df, on='KIC')
+
+    return class_df

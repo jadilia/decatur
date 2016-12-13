@@ -17,20 +17,6 @@ from . import utils
 from .config import data_dir
 
 
-def get_classification_results(class_file, catalog_file):
-    """
-    Get the classification results file.
-    """
-    class_file = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                              'data', class_file))
-
-    df = pd.read_pickle(class_file)
-    kebc = utils.load_catalog(catalog_file)
-    class_df = pd.merge(kebc, df, on='KIC')
-
-    return class_df
-
-
 def plot_prot_porb(class_file, plot_file=None, catalog_file='kebc.csv'):
     """
     Plot P_orb / P_rot vs. P_orb.
@@ -44,7 +30,7 @@ def plot_prot_porb(class_file, plot_file=None, catalog_file='kebc.csv'):
     catalog_file : str, optional
         Specify an alternate eclipsing binary catalog filename.
     """
-    join = get_classification_results(class_file, catalog_file)
+    join = utils.get_classification_results(class_file, catalog_file)
 
     spot_mask = join['class'] == 'sp'
     ev_mask = join['class'] == 'ev'
@@ -97,7 +83,7 @@ def synchronization_histogram(class_file, dy=0.025, plot_file=None,
     catalog_file : str, optional
         Specify an alternate eclipsing binary catalog filename.
     """
-    df = get_classification_results(class_file, catalog_file)
+    df = utils.get_classification_results(class_file, catalog_file)
 
     p_orb_p_rot = df['period_x'].values / df['p_rot_1'].values
 
@@ -157,7 +143,7 @@ def classification_metric(class_file, metric_file, metric1='pwidth',
     plot_file : str, optional
         Specify an alternate output plot file.
     """
-    class_df = get_classification_results(class_file, 'kebc.csv')
+    class_df = utils.get_classification_results(class_file, 'kebc.csv')
     df = pd.read_csv('{}/{}'.format(data_dir, metric_file), dtype={'KIC': int})
 
     merge = pd.merge(class_df, df, on='KIC')
@@ -207,7 +193,7 @@ def sync_vs_e_cos_w(class_file):
     class_file : str
         Pickle file containing the classifications and rotation periods.
     """
-    df = get_classification_results(class_file, 'kebc.csv')
+    df = utils.get_classification_results(class_file, 'kebc.csv')
 
     fig, ax = plt.subplots()
 
@@ -241,7 +227,7 @@ def sync_vs_t_eff(class_file, source='kic'):
         Source of the effective temperatures.
         KIC, Pinsonneault (2012), Casagrande (2010), Armstrong (2014)
     """
-    df = get_classification_results(class_file, 'kebc.csv')
+    df = utils.get_classification_results(class_file, 'kebc.csv')
 
     datafile = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                             'data/armstrong14.tsv'))
