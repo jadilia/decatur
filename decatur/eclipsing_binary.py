@@ -293,11 +293,16 @@ class EclipsingBinary(object):
                                                          self.l_curve.fluxes,
                                                          cadences=self.l_curve.cadences)
 
-    def find_acf_peaks(self):
+    def find_acf_peaks(self, plot=False):
         """
         Find the peaks in the autocorrelation function.
+
+        Parameters
+        ----------
+        plot : bool, optional
+            Set to True to make ACF plot.
         """
-        returns = interpacf.dominant_period(self.lags, self.acf)
+        returns = interpacf.dominant_period(self.lags, self.acf, plot=plot)
         self.peak_max, self.all_peaks, self.peak_height = returns
 
     def phase_evolution_plot(self, t_min=0., t_max=10000.):
