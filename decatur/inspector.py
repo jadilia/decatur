@@ -284,7 +284,7 @@ class InspectorGadget(object):
             acf = self.h5_acf['{}/acf'.format(kic)][:]
             self.acf_plot.set_xdata(lags)
             self.acf_plot.set_ydata(acf / acf.max())
-            self.ax3.set_xlim(0, 4 * self.results['period'][index])
+            self.ax3.set_xlim(0, 45)
 
             self.peak_1_line.set_xdata(self.results['peak_1'][index])
             self.p_rot_line_3.set_xdata(self.results['peak_max'][index])
