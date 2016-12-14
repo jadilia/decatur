@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from . import utils
+from . import eclipsing_binary, utils
 from .config import data_dir
 
 
@@ -279,3 +279,54 @@ def sync_vs_t_eff(class_file, source='kic'):
     ax2.legend(loc='upper right', scatterpoints=1, markerscale=4)
 
     fig2.savefig('{}/p_orb-t_eff.pdf'.format(data_dir))
+
+
+def class_examples(class_id='sp'):
+    """
+
+    :return:
+    """
+    fig, axarr = plt.subplots(nrows=3, ncols=2, figsize=(10, 30))
+
+    eb_sp = eclipsing_binary.EclipsingBinary.from_kic(7129465)
+    eb_ev1 = eclipsing_binary.EclipsingBinary.from_kic(4574310)
+    eb_ev2 = eclipsing_binary.EclipsingBinary.from_kic(5770860)
+    eb_pu = eclipsing_binary.EclipsingBinary.from_kic(8560861)
+    eb_fl = eclipsing_binary.EclipsingBinary.from_kic(1571511)
+    eb_hb = eclipsing_binary.EclipsingBinary.from_kic(2697935)
+
+    for eb in [eb_sp, eb_ev1, eb_ev2, eb_pu, eb_fl, eb_hb]:
+        eb.detrend_and_normalize()
+
+    axarr[0, 0].plot(eb_sp.l_curve.times, eb_sp.l_curve.fluxes, color='r')
+    axarr[0, 0].set_xlim(400, 500)
+    axarr[0, 0].set_ylim(-0.3, 0.05)
+
+    axarr[0, 1].plot(eb_fl.l_curve.times, eb_fl.l_curve.fluxes, color='k')
+    axarr[0, 1].set_xlim(450, 600)
+    axarr[0, 1].set_ylim(-0.025, 0.01)
+
+    axarr[1, 0].plot(eb_ev1.l_curve.times, eb_ev1.l_curve.fluxes, color='b')
+    axarr[1, 0].set_xlim(410, 420)
+    axarr[1, 0].set_ylim(-0.45, 0.1)
+
+    axarr[1, 1].plot(eb_ev2.l_curve.times, eb_ev2.l_curve.fluxes, color='b')
+    axarr[1, 1].set_xlim(420, 424)
+    axarr[1, 1].set_ylim(-0.1, 0.1)
+
+    axarr[2, 0].plot(eb_hb.l_curve.times, eb_hb.l_curve.fluxes, color='k')
+    axarr[2, 0].set_xlim(640, 720)
+    axarr[2, 0].set_ylim(-0.0025, 0.0025)
+
+    axarr[2, 1].plot(eb_pu.l_curve.times, eb_pu.l_curve.fluxes, color='k')
+    axarr[2, 1].set_xlim(450, 500)
+    axarr[2, 1].set_ylim(-0.03, 0.004)
+
+    for ax in axarr[2, :].flatten():
+        ax.set_xlabel('Time (days)')
+
+    for ax in axarr[:, 0].flatten():
+        ax.set_ylabel('Relative Flux')
+
+    plt.show()
+
