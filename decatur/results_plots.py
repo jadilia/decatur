@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from . import eclipsing_binary, utils
+from . import analyze_sample, eclipsing_binary, utils
 from .config import data_dir
 
 
@@ -281,6 +281,62 @@ def sync_vs_t_eff(class_file, source='kic'):
     fig2.savefig('{}/p_orb-t_eff.pdf'.format(data_dir))
 
 
+def phase_correlation_example():
+    """
+
+    :return:
+    """
+    eb_sp = eclipsing_binary.EclipsingBinary.from_kic(7129465)
+    eb_sp.detrend_and_normalize()
+    eb_sp.interpolate_over_eclipse(window=1.5)
+
+    cycle_sp, corr_sp = analyze_sample.phase_correlation(eb_sp.l_curve.times,
+                                                         eb_sp.l_curve.fluxes,
+                                                         eb_sp.params.p_orb,
+                                                         eb_sp.params.bjd_0)
+
+    eb_ev = eclipsing_binary.EclipsingBinary.from_kic(4574310)
+    eb_ev.detrend_and_normalize()
+    eb_ev.interpolate_over_eclipse(window=1.5)
+
+    cycle_ev, corr_ev = analyze_sample.phase_correlation(eb_ev.l_curve.times,
+                                                         eb_ev.l_curve.fluxes,
+                                                         eb_ev.params.p_orb,
+                                                         eb_ev.params.bjd_0)
+
+    fig, axarr = plt.subplots(nrows=2, ncols=2, figsize=(12, 10))
+
+    axarr[0, 0].plot(eb_ev.l_curve.times, eb_ev.l_curve.fluxes_detrended,
+                     color='grey')
+    axarr[0, 0].plot(eb_ev.l_curve.times, eb_ev.l_curve.fluxes,
+                     color='b')
+    axarr[0, 0].set_xlim(410, 420)
+    axarr[0, 0].set_ylim(-0.45, 0.1)
+    axarr[0, 0].set_xlabel('Time (Days)')
+    axarr[0, 0].set_ylabel('Relative Flux')
+
+    axarr[0, 1].plot(cycle_ev, corr_ev, color='b')
+    axarr[0, 1].set_ylim(-1.1, 1.1)
+    axarr[0, 1].set_xlabel('Cycle Number')
+    axarr[0, 1].set_ylabel('Phase Correlation')
+
+    axarr[1, 0].plot(eb_sp.l_curve.times, eb_sp.l_curve.fluxes_detrended,
+                     color='grey')
+    axarr[1, 0].plot(eb_sp.l_curve.times, eb_sp.l_curve.fluxes,
+                     color='r')
+    axarr[1, 0].set_xlim(400, 500)
+    axarr[1, 0].set_ylim(-0.3, 0.05)
+    axarr[1, 0].set_xlabel('Time (Days)')
+    axarr[1, 0].set_ylabel('Relative Flux')
+
+    axarr[1, 1].plot(cycle_sp, corr_sp, color='r')
+    axarr[1, 1].set_ylim(-1.1, 1.1)
+    axarr[1, 1].set_xlabel('Cycle Number')
+    axarr[1, 1].set_ylabel('Phase Correlation')
+
+    plt.savefig('{}/phase_corr_example.pdf'.format(data_dir))
+
+
 def class_examples(class_id='sp'):
     """
 
@@ -329,4 +385,5 @@ def class_examples(class_id='sp'):
         ax.set_ylabel('Relative Flux')
 
     plt.show()
+
 
