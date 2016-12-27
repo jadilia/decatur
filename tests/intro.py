@@ -12,7 +12,7 @@ import decatur
 # EB with starspots
 eb_spots = decatur.eclipsing_binary.EclipsingBinary.from_kic(7129465,
                                                              from_db=False)
-eb_spots.detrend_and_normalize()
+eb_spots.normalize()
 
 plt.figure(1)
 plt.plot(eb_spots.l_curve.times, eb_spots.l_curve.fluxes)
@@ -20,7 +20,7 @@ plt.plot(eb_spots.l_curve.times, eb_spots.l_curve.fluxes)
 # EB with ellipsoidal variations
 eb_ellip = decatur.eclipsing_binary.EclipsingBinary.from_kic(6213131,
                                                              from_db=False)
-eb_ellip.detrend_and_normalize()
+eb_ellip.normalize()
 
 plt.figure(2)
 plt.plot(eb_ellip.l_curve.times, eb_ellip.l_curve.fluxes)
@@ -28,7 +28,7 @@ plt.plot(eb_ellip.l_curve.times, eb_ellip.l_curve.fluxes)
 # EB with no periodic out-of-eclipse variability
 eb_flat = decatur.eclipsing_binary.EclipsingBinary.from_kic(5553624,
                                                             from_db=False)
-eb_flat.detrend_and_normalize()
+eb_flat.normalize()
 
 plt.figure(3)
 plt.plot(eb_flat.l_curve.times, eb_flat.l_curve.fluxes)

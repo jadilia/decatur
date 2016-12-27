@@ -75,7 +75,7 @@ def compute_periodicity(kind, width_max=0.25, period_min=0.01, period_max=100.,
     for ii, kic in enumerate(kics):
         eb = eclipsing_binary.EclipsingBinary.from_kic(kic, from_db=from_db)
 
-        eb.detrend_and_normalize()
+        eb.normalize()
 
         if eb.params.width_pri < width_max:
             eb.interpolate_over_eclipse(window=window)
@@ -311,7 +311,7 @@ def correlation_at_p_orb(width_max=0.25, savefile=None):
     for ii, kic in enumerate(kics):
 
         eb = eclipsing_binary.EclipsingBinary.from_kic(kic)
-        eb.detrend_and_normalize()
+        eb.normalize()
 
         if eb.params.width_pri < width_max:
             eb.interpolate_over_eclipse()

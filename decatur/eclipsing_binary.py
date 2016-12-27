@@ -177,12 +177,16 @@ class EclipsingBinary(object):
             print('Returning empty BinaryParameters object.')
             return cls(light_curve, BinaryParameters())
 
-    def detrend_and_normalize(self, poly_order=3):
+    def normalize(self, detrend=True, poly_order=3):
         """
         Detrend and normalize light curve with a low order polynomial.
 
         Light curves are detrended on a per-quarter basis.
 
+        Parameters
+        ----------
+        detrend : bool, optional
+            Set to False to turn of polynomial detrending.
         poly_order: int, optional
             The order of the polynomial fit.
         """
@@ -196,17 +200,21 @@ class EclipsingBinary(object):
         for quarter in np.unique(self.l_curve.quarters):
             mask = self.l_curve.quarters == quarter
 
-            # Compute polynomial fit
-            poly = np.polyfit(self.l_curve.times[mask],
-                              self.l_curve.fluxes[mask], poly_order)
-            z = np.poly1d(poly)
-
             median_flux = np.nanmedian(self.l_curve.fluxes[mask])
 
-            # Subtract fit and median normalize
-            fluxes_detrended[mask] = (self.l_curve.fluxes[mask] -
-                                      z(self.l_curve.times[mask])) \
-                / median_flux
+            if detrend:
+                # Compute polynomial fit
+                poly = np.polyfit(self.l_curve.times[mask],
+                              self.l_curve.fluxes[mask], poly_order)
+                z = np.poly1d(poly)
+
+                # Subtract fit and median normalize
+                fluxes_detrended[mask] = (self.l_curve.fluxes[mask] -
+                                          z(self.l_curve.times[mask])) \
+                    / median_flux
+            else:
+                fluxes_detrended[mask] = (self.l_curve.fluxes[mask] -
+                                          median_flux) / median_flux
 
             flux_errs_normed[mask] = self.l_curve.flux_errs[mask] / median_flux
 
@@ -315,7 +323,7 @@ class EclipsingBinary(object):
             The minimum and maximum observation times to plot. The defaults
             will include all data.
         """
-        self.detrend_and_normalize()
+        self.normalize()
         phase = self.phase_fold()
         mask = (self.l_curve.times > t_min) & (self.l_curve.times < t_max)
         phase = phase[mask]

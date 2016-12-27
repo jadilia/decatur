@@ -287,7 +287,7 @@ def phase_correlation_example():
     :return:
     """
     eb_sp = eclipsing_binary.EclipsingBinary.from_kic(7129465)
-    eb_sp.detrend_and_normalize()
+    eb_sp.normalize()
     eb_sp.interpolate_over_eclipse(window=1.5)
 
     cycle_sp, corr_sp = analyze_sample.phase_correlation(eb_sp.l_curve.times,
@@ -296,7 +296,7 @@ def phase_correlation_example():
                                                          eb_sp.params.bjd_0)
 
     eb_ev = eclipsing_binary.EclipsingBinary.from_kic(4574310)
-    eb_ev.detrend_and_normalize()
+    eb_ev.normalize()
     eb_ev.interpolate_over_eclipse(window=1.5)
 
     cycle_ev, corr_ev = analyze_sample.phase_correlation(eb_ev.l_curve.times,
@@ -352,7 +352,7 @@ def class_examples(class_id='sp'):
     eb_hb = eclipsing_binary.EclipsingBinary.from_kic(2697935)
 
     for eb in [eb_sp, eb_ev1, eb_ev2, eb_pu, eb_fl, eb_hb]:
-        eb.detrend_and_normalize()
+        eb.normalize()
 
     axarr[0, 0].plot(eb_sp.l_curve.times, eb_sp.l_curve.fluxes, color='r')
     axarr[0, 0].set_xlim(400, 500)

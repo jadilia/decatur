@@ -256,7 +256,7 @@ class InspectorGadget(object):
                                                        catalog_file=self.catalog_file,
                                                        from_db=self.from_db,
                                                        use_pdc=self.use_pdc)
-        eb.detrend_and_normalize()
+        eb.normalize()
 
         self.light_curve.set_xdata(eb.l_curve.times)
         self.light_curve.set_ydata(eb.l_curve.fluxes)
