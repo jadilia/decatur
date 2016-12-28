@@ -10,6 +10,10 @@ data_dir = os.getenv('DECATUR_DATA_DIR')
 if data_dir is None:
     data_dir = '.'
 
+# Repository data directory
+repo_data_dir = catalog_file = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                                            'data'))
+
 # Load database parameters from environment variables
 host = os.getenv('DB_HOST')
 user = os.getenv('DB_USER')

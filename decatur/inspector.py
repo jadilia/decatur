@@ -90,8 +90,8 @@ class InspectorGadget(object):
 
         merge = utils.merge_catalogs(catalog_file, pgram_results, acf_results)
 
-        self.results_file = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                                         'data', results_file))
+        self.results_file = '{}/{}'.format(config.repo_data_dir, results_file)
+
         if os.path.exists(self.results_file):
             self.results = pd.read_pickle(self.results_file)
         else:

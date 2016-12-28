@@ -7,7 +7,7 @@ import os
 
 import pandas as pd
 
-from .config import data_dir
+from .config import data_dir, repo_data_dir
 
 
 def load_catalog(catalog_file='kebc.csv'):
@@ -32,8 +32,7 @@ def load_catalog(catalog_file='kebc.csv'):
         If the catalog file does not exist.
     """
     # Construct the absolute path of the catalog file
-    catalog_file = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                                'data', catalog_file))
+    catalog_file = '{}/{}'.format(repo_data_dir, catalog_file)
 
     if not os.path.exists(catalog_file):
         raise IOError('No such catalog file: {}'.format(catalog_file))
@@ -88,8 +87,7 @@ def get_classification_results(class_file, catalog_file):
     """
     Get the classification results file.
     """
-    class_file = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                              'data', class_file))
+    class_file = '{}/{}'.format(repo_data_dir, class_file)
 
     df = pd.read_pickle(class_file)
     kebc = load_catalog(catalog_file)

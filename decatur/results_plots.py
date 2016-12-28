@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from . import analyze_sample, eclipsing_binary, utils
-from .config import data_dir
+from .config import data_dir, repo_data_dir
 
 
 def plot_prot_porb(class_file, plot_file=None, catalog_file='kebc.csv'):
@@ -229,8 +229,7 @@ def sync_vs_t_eff(class_file, source='kic'):
     """
     df = utils.get_classification_results(class_file, 'kebc.csv')
 
-    datafile = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                            'data/armstrong14.tsv'))
+    datafile = os.path.abspath('{}/armstrong14.tsv'.format(repo_data_dir))
 
     arm14 = pd.read_csv(datafile, delim_whitespace=True)
 
@@ -385,5 +384,6 @@ def class_examples(class_id='sp'):
         ax.set_ylabel('Relative Flux')
 
     plt.show()
+
 
 
