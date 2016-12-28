@@ -17,7 +17,7 @@ import pandas as pd
 from scipy import stats, interpolate
 
 from . import eclipsing_binary, kepler_data, utils
-from .config import data_dir
+from .config import data_dir, repo_data_dir
 
 
 def compute_periodicity(kind, width_max=0.25, period_min=0.01, period_max=100.,
@@ -389,3 +389,21 @@ def find_acf_peaks(acf_file, results_file=None):
 
     df = pd.DataFrame(data=rec_array)
     df.to_pickle('{}/{}'.format(data_dir, results_file))
+
+def create_inspection_datafile(datafile='inspection_data.h5'):
+    """
+    Create an HDF5 file to store the classification data.
+
+    Parameters
+    ----------
+    datafile : str, optional
+        Specify an alternate datafile name.
+    """
+    df = pd.read_csv('{}/{}'.format(repo_data_dir, 'initial_class.csv'))
+
+    dt = h5py.special_dtype(vlen=str)
+
+    h5 = h5py.File('{}/{}'.format(repo_data_dir, datafile), mode='x')
+    h5.create_dataset('kic', data=df['KIC'].values, dtype=np.uint64)
+    h5.create_dataset('p_orb', data=df['period'].values, dtype=np.float64)
+    h5.create_dataset('class', data=df['class'].values, dtype=dt)
