@@ -104,7 +104,8 @@ def compute_periodicity(kind, width_max=0.25, period_min=0.01, period_max=100.,
     h5.close()
 
 
-def measure_rotation_periods(periodograms_file, results_file=None,
+def measure_rotation_periods(periodograms_file,
+                             class_datafile='inspection_data.h5',
                              period_min=0.01, period_max=100.):
     """
     Measure rotation periods for the Kepler eclipsing binary sample.
@@ -113,54 +114,53 @@ def measure_rotation_periods(periodograms_file, results_file=None,
     ----------
     periodograms_file : str
         HD5F file containing the periodograms.
-    results_file : str, optional
-        Specify an alternate output results filename.
+    class_datafile : str, optional
+        The HDF5 file to store the rotation periods in.
     period_min, period_max : float, optional
         Will only search for `period_min` < period < `period_max`
     """
-    h5 = h5py.File('{}/{}'.format(data_dir, periodograms_file), 'r')
+    h5_pgram = h5py.File('{}/{}'.format(data_dir, periodograms_file), 'r')
+    h5_class = h5py.File('{}/{}'.format(repo_data_dir, class_datafile), 'r+')
 
-    kics = np.array(h5.keys(), dtype=np.int64)
+    kics = np.array(h5_class['kic'][:], dtype=np.int64)
 
-    dtypes = [('KIC', np.uint64), ('p_rot_1', np.float64),
-              ('peak_power_1', np.float64), ('cross_corr_1', np.float64)]
-    rec_array = np.recarray(len(kics), dtype=dtypes)
+    p_rot_1 = np.zeros(len(kics), dtype=np.float64)
+    peak_power_1 = np.zeros_like(p_rot_1)
 
     total_systems = len(kics)
     print('Measuring rotation periods for {} systems...'.format(total_systems))
 
     for ii, kic in enumerate(kics):
 
-        periods = h5['{}/periods'.format(kic)][:]
-        powers = h5['{}/powers'.format(kic)][:]
+        periods = h5_pgram['{}/periods'.format(kic)][:]
+        powers = h5_pgram['{}/powers'.format(kic)][:]
 
         keep = (periods > period_min) & (periods < period_max)
 
         index_max = np.argmax(powers[keep])
 
-        p_rot_1 = periods[keep][index_max]
-
-        eb = eclipsing_binary.EclipsingBinary.from_kic(kic)
-        corr = phase_correlation(eb.l_curve.times, eb.l_curve.fluxes,
-                                 p_fold=p_rot_1, t_0=eb.params.bjd_0)[1]
-        cross_corr_1 = np.nanmedian(corr)
-
-        rec_array[ii]['KIC'] = kic
-        rec_array[ii]['p_rot_1'] = p_rot_1
-        rec_array[ii]['peak_power_1'] = powers[keep][index_max]
-        rec_array[ii]['cross_corr_1'] = cross_corr_1
+        p_rot_1[ii] = periods[keep][index_max]
+        peak_power_1[ii] = powers[keep][index_max]
 
         sys.stdout.write('\r{:.1f}% complete'.format((ii + 1) * 100 / total_systems))
         sys.stdout.flush()
 
     print()
 
-    if results_file is None:
-        today = '{:%Y%m%d}'.format(datetime.date.today())
-        results_file = 'rotation_periods.{}.pkl'.format(today)
+    if 'pgram' in list(h5_class.keys()):
+        pgram = h5_class['pgram']
+    else:
+        pgram = h5_class.create_group('pgram')
 
-    df = pd.DataFrame(data=rec_array)
-    df.to_pickle('{}/{}'.format(data_dir, results_file))
+    for dataset in ['p_rot_1', 'peak_power_1']:
+        if dataset in list(pgram.keys()):
+            dset = pgram[dataset]
+            dset[...] = eval(dataset)
+        else:
+            pgram.create_dataset(dataset, data=eval(dataset))
+
+    pgram.attrs['run_time'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    pgram.attrs['width_max'] = h5_pgram.attrs['width_max']
 
 
 def phase_folded_median(phase, fluxes, delta_phase):
@@ -389,6 +389,7 @@ def find_acf_peaks(acf_file, results_file=None):
 
     df = pd.DataFrame(data=rec_array)
     df.to_pickle('{}/{}'.format(data_dir, results_file))
+    
 
 def create_inspection_datafile(datafile='inspection_data.h5'):
     """
