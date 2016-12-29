@@ -338,7 +338,7 @@ def correlation_at_p_orb(width_max=0.25, savefile=None):
     df.to_csv('{}/{}'.format(data_dir, savefile))
 
 
-def find_acf_peaks(acf_file, results_file=None):
+def find_acf_peaks(acf_file, class_datafile='inspection_data.h5'):
     """
     Find peaks in the auto-correlation function (ACF).
 
@@ -348,48 +348,50 @@ def find_acf_peaks(acf_file, results_file=None):
     ----------
     acf_file : str
         HDF5 file containing the ACFs.
-    results_file : str, optional
-        Specify an alternate output results filename.
+    class_datafile : str, optional
+        The HDF5 file to store the rotation periods in.
     """
-    h5 = h5py.File('{}/{}'.format(data_dir, acf_file), 'r')
+    h5_acf = h5py.File('{}/{}'.format(data_dir, acf_file), 'r')
+    h5_class = h5py.File('{}/{}'.format(repo_data_dir, class_datafile))
 
-    kics = np.array(h5.keys(), dtype=np.int64)
+    kics = h5_class['kic'][:]
 
-    dtypes = [('KIC', np.uint64), ('peak_1', np.float64),
-              ('peak_2', np.float64), ('peak_3', np.float64),
-              ('peak_4', np.float64), ('peak_max', np.float64),
-              ('max_height', np.float64)]
-    rec_array = np.recarray(len(kics), dtype=dtypes)
+    p_rot_1 = np.zeros(len(kics), dtype=np.float64)
+    peak_height_1 = np.zeros_like(p_rot_1)
 
     total_systems = len(kics)
     print('Finding ACF peaks for {} systems...'.format(total_systems))
 
     for ii, kic in enumerate(kics):
 
-        lags = h5['{}/lags'.format(kic)][:]
-        acf = h5['{}/acf'.format(kic)][:]
+        lags = h5_acf['{}/lags'.format(kic)][:]
+        acf = h5_acf['{}/acf'.format(kic)][:]
 
         peak_max, peaks, h_p = interpacf.dominant_period(lags, acf)
 
-        rec_array[ii]['KIC'] = kic
-        rec_array[ii]['peak_max'] = peak_max
-        rec_array[ii]['max_height'] = h_p
-
-        for jj in range(len(peaks))[:4]:
-            rec_array[ii]['peak_{}'.format(jj + 1)] = peaks[jj]
+        p_rot_1[ii] = peak_max
+        peak_height_1[ii] = h_p
 
         sys.stdout.write('\r{:.1f}% complete'.format((ii + 1) * 100 / total_systems))
         sys.stdout.flush()
 
     print()
 
-    if results_file is None:
-        today = '{:%Y%m%d}'.format(datetime.date.today())
-        results_file = 'acf_peaks.{}.pkl'.format(today)
+    if 'acf' in list(h5_class.keys()):
+        acf = h5_class['acf']
+    else:
+        acf = h5_class.create_group('acf')
 
-    df = pd.DataFrame(data=rec_array)
-    df.to_pickle('{}/{}'.format(data_dir, results_file))
-    
+    for dataset in ['p_rot_1', 'peak_height_1']:
+        if dataset in list(acf.keys()):
+            dset = acf[dataset]
+            dset[...] = eval(dataset)
+        else:
+            acf.create_dataset(dataset, data=eval(dataset))
+
+    acf.attrs['run_time'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    acf.attrs['width_max'] = h5_acf.attrs['width_max']
+
 
 def create_inspection_datafile(datafile='inspection_data.h5'):
     """
