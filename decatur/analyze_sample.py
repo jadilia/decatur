@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy import stats, interpolate
 
-from . import eclipsing_binary, kepler_data, utils
+from . import eclipsing_binary, kepler_data
 from .config import data_dir, repo_data_dir
 
 
@@ -287,7 +287,8 @@ def phase_correlation(times, fluxes, p_fold, t_0=0., delta_phase=0.01,
     return cycle_num, corr
 
 
-def correlation_at_p_orb(width_max=0.25, savefile=None):
+def correlation_at_p_orb(width_max=0.25, class_datafile='inspection_data.h5',
+                         detrend=True):
     """
     Compute the cross correlation with the median light curve folded at the
     orbital period.
@@ -297,21 +298,24 @@ def correlation_at_p_orb(width_max=0.25, savefile=None):
     width_max : float, optional
         Eclipses will be interpolated over if the primary phase width
         is less than `width_max`.
-    savefile : str, optional
-        Specify an alternate output file.
+    class_datafile : str, optional
+        The HDF5 file to store the rotation periods in.
+    detrend : bool, optional
+        Set to False to not detrend light curves.
     """
-    kebc = utils.load_catalog()
-    kics = kebc['KIC']
+    h5 = h5py.File('{}/{}'.format(repo_data_dir, class_datafile), 'r+')
 
-    correlations = np.zeros(len(kebc), dtype=float) - 1.
+    kics = h5['kic']
+
+    correlations = np.zeros(len(kics), dtype=float) - 1.
 
     total_systems = len(kics)
     print('Measuring phase correlation for {} systems...'.format(total_systems))
 
-    for ii, kic in enumerate(kics):
+    for ii, kic in enumerate(kics[:3]):
 
         eb = eclipsing_binary.EclipsingBinary.from_kic(kic)
-        eb.normalize()
+        eb.normalize(detrend=detrend)
 
         if eb.params.width_pri < width_max:
             eb.interpolate_over_eclipse()
@@ -326,16 +330,19 @@ def correlation_at_p_orb(width_max=0.25, savefile=None):
 
     print()
 
-    if savefile is None:
-        savefile = 'corr_at_p_orb.csv'
+    if 'corr' in list(h5.keys()):
+        group = h5['corr']
+    else:
+        group = h5.create_group('corr')
 
-    dtypes = [('KIC', np.uint64), ('corr', np.float32)]
-    rec_array = np.recarray(len(kics), dtype=dtypes)
-    rec_array['KIC'] = kics
-    rec_array['corr'] = correlations
+    if 'corr' in list(group.keys()):
+        dset = group['corr']
+        dset[...] = eval('correlations')
+    else:
+        group.create_dataset('corr', data=eval('correlations'))
 
-    df = pd.DataFrame(rec_array)
-    df.to_csv('{}/{}'.format(data_dir, savefile))
+    group.attrs['run_time'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    group.attrs['width_max'] = width_max
 
 
 def find_acf_peaks(acf_file, class_datafile='inspection_data.h5'):
