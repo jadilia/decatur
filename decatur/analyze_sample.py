@@ -312,7 +312,7 @@ def correlation_at_p_orb(width_max=0.25, class_datafile='inspection_data.h5',
     total_systems = len(kics)
     print('Measuring phase correlation for {} systems...'.format(total_systems))
 
-    for ii, kic in enumerate(kics[:3]):
+    for ii, kic in enumerate(kics):
 
         eb = eclipsing_binary.EclipsingBinary.from_kic(kic)
         eb.normalize(detrend=detrend)
@@ -343,6 +343,7 @@ def correlation_at_p_orb(width_max=0.25, class_datafile='inspection_data.h5',
 
     group.attrs['run_time'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     group.attrs['width_max'] = width_max
+    group.attrs['detrend'] = detrend
 
 
 def find_acf_peaks(acf_file, class_datafile='inspection_data.h5'):
