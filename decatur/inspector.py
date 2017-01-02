@@ -6,12 +6,9 @@ Visually inspect light curves and periodograms
 
 from __future__ import print_function, division, absolute_import
 
-import os
-
 from builtins import input
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import h5py
 
 from . import config, eclipsing_binary, utils
@@ -47,14 +44,10 @@ class InspectorGadget(object):
 
     Parameters
     ----------
-    pgram_results : str
-        Pickle file containing the rotation periods from periodograms.
-    acf_results : str
-        Pickle file containing the rotation periods from ACFs.
-    pgram_file : str
-        Name of the HDF5 file containing the periodograms.
-    results_file : str
-        Specify an alternate pickle file for the inspection results.
+    pgram_file, acf_file : str
+        Names of the HDF5 file containing the periodograms and ACFs.
+    results_file : str, optional
+        Specify an alternate HDF5 file for the inspection results.
     catalog_file : str, optional
         Specify an alternate eclipsing binary catalog filename.
     sort_on : str, optional
@@ -74,9 +67,9 @@ class InspectorGadget(object):
     use_pdc : bool, optional
         Set to False to use SAP instead of PDC flux.
     """
-    def __init__(self, pgram_results, acf_results, pgram_file, acf_file,
-                 results_file='inspect.pkl', catalog_file='kebc.csv',
-                 sort_on='KIC', class_filter=None, from_db=True, zoom_pan=0.05,
+    def __init__(self, pgram_file, acf_file,
+                 results_file='inspection_data.h5', catalog_file='kebc.csv',
+                 sort_on='kic', class_filter=None, from_db=True, zoom_pan=0.05,
                  pgram_on=True, acf_on=True, phase_fold_on=False,
                  use_pdc=True):
         self.catalog_file = catalog_file
@@ -88,37 +81,30 @@ class InspectorGadget(object):
         self.use_pdc = use_pdc
         self.phase_fold_on = phase_fold_on
 
-        merge = utils.merge_catalogs(catalog_file, pgram_results, acf_results)
-
-        self.results_file = '{}/{}'.format(config.repo_data_dir, results_file)
-
-        if os.path.exists(self.results_file):
-            self.results = pd.read_pickle(self.results_file)
-        else:
-            self.results = _create_results_file(merge)
-            self.results.to_pickle(self.results_file)
+        self.results = h5py.File('{}/{}'.format(config.repo_data_dir, results_file),
+                                 'r+')
 
         if class_filter is not None:
-            to_sort = self.results[self.results['class'] == class_filter]
+            keep = self.results['class'][:] == class_filter
         else:
-            to_sort = self.results
+            keep = np.repeat(True, len(self.results['class'][:]))
 
         if sort_on[-2:] == '_r':
             # Reverse sort
             sort_on = sort_on[:-2]
-            self.sort_indices = to_sort.sort_values(sort_on, ascending=False).index.values
+            self.sort_indices = np.argsort(self.results[sort_on][:])[keep][::-1]
         else:
-            self.sort_indices = to_sort.sort_values(sort_on, ascending=True).index.values
+            self.sort_indices = np.argsort(self.results[sort_on][:])[keep]
 
-        # Find the last classified light target
-        classified = to_sort['class'] != '-1'
+        # Find the last classified target.
+        classified = self.results['class'][:][keep] != '-1'
         if np.sum(classified) == 0:
             self.start_index = 0
         elif class_filter is not None:
             self.start_index = self.sort_indices[0]
         else:
-            classified = self.results[sort_on][self.sort_indices][classified]
-            self.start_index = classified.index[-1]
+            classified = self.sort_indices[classified]
+            self.start_index = classified[-1]
 
         # Load the periodograms
         self.h5 = h5py.File('{}/{}'.format(config.data_dir, pgram_file))
@@ -150,7 +136,6 @@ class InspectorGadget(object):
         self.p_rot_line_2 = None
         self.p_orb_line_3 = None
         self.p_rot_line_3 = None
-        self.peak_1_line = None
 
         self.zoom_pan_axis = 1
 
@@ -210,9 +195,8 @@ class InspectorGadget(object):
             self.ax3.set_xlabel('Lag (days)')
             self.ax3.set_ylabel('ACF')
 
-            # Vertical lines a orbital period, first peak, and highest peak
+            # Vertical lines a orbital period and highest peak
             self.p_rot_line_3 = self.ax3.axvline(0, color='r')
-            self.peak_1_line = self.ax3.axvline(0, color='g')
             self.p_orb_line_3 = self.ax3.axvline(0, color='b')
         else:
             self.subplot_list.remove('3')
@@ -226,15 +210,15 @@ class InspectorGadget(object):
         index : int
             Index of the system in the results DataFrame.
         """
-        print('\nKIC {}'.format(self.results['KIC'][index]))
+        print('\nKIC {}'.format(self.results['kic'][index]))
         print('-----------------------------------')
-        print('P_orb    P_rot     class  p_rot_alt')
+        print('P_orb    P_pgram     P_acf  class')
         print('-----------------------------------')
-        header = '{:>6.2f}  {:>5.2f}  {:>10s}  {:>5.2f} \n'
-        print(header.format(self.results['period'][index],
-                            self.results['p_rot_1'][index],
-                            self.results['class'][index],
-                            self.results['p_rot_alt'][index]))
+        header = '{:>6.2f}  {:>5.2f}  {:>5.2f}  {:>10s} \n'
+        print(header.format(self.results['p_orb'][index],
+                            self.results['pgram/p_rot_1'][index],
+                            self.results['acf/p_rot_1'][index],
+                            self.results['class'][index]))
 
     def _update(self, index):
         """
@@ -250,7 +234,7 @@ class InspectorGadget(object):
 
         self.zoom_pan_axis = 1
 
-        kic = self.results['KIC'][index]
+        kic = self.results['kic'][index]
 
         eb = eclipsing_binary.EclipsingBinary.from_kic(kic,
                                                        catalog_file=self.catalog_file,
@@ -276,8 +260,8 @@ class InspectorGadget(object):
             self.ax2.set_xlim(0, 45)
             self.ax2.set_ylim(0, 1.1 * powers.max())
 
-            self.p_rot_line_2.set_xdata(self.results['p_rot_1'][index])
-            self.p_orb_line_2.set_xdata(self.results['period'][index])
+            self.p_rot_line_2.set_xdata(self.results['pgram/p_rot_1'][index])
+            self.p_orb_line_2.set_xdata(self.results['p_orb'][index])
 
         if self.acf_on:
             lags = self.h5_acf['{}/lags'.format(kic)][:]
@@ -286,9 +270,8 @@ class InspectorGadget(object):
             self.acf_plot.set_ydata(acf / acf.max())
             self.ax3.set_xlim(0, 45)
 
-            self.peak_1_line.set_xdata(self.results['peak_1'][index])
-            self.p_rot_line_3.set_xdata(self.results['peak_max'][index])
-            self.p_orb_line_3.set_xdata(self.results['period'][index])
+            self.p_rot_line_3.set_xdata(self.results['acf/p_rot_1'][index])
+            self.p_orb_line_3.set_xdata(self.results['p_orb'][index])
 
         if self.phase_fold_on:
             phase = eb.phase_fold()
@@ -314,15 +297,13 @@ class InspectorGadget(object):
             Index of the system in the results DataFrame
         """
         user_class = input('\nType of out-of-eclipse variability: ').lower()
-        self.results.loc[index, 'class'] = str(user_class)
+        self.results['class'][index] = str(user_class)
 
         alternate_p_rot = input('Alternate rotation period?: ').lower()
 
         if alternate_p_rot == 'y':
             user_p_rot = input('Rotation period: ')
-            self.results.loc[index, 'p_rot_alt'] = float(user_p_rot)
-
-        self.results.to_pickle(self.results_file)
+            # self.results.loc[index, 'p_rot_alt'] = float(user_p_rot)
 
     def _key_press(self, event):
         """
@@ -398,7 +379,7 @@ class InspectorGadget(object):
 
             elif utils.is_int(user_input):
                 try:
-                    index = np.where(int(user_input) == self.results['KIC'])[0][0]
+                    index = np.where(int(user_input) == self.results['kic'][:])[0][0]
                     ii = np.where(self.sort_indices == index)[0][0]
                 except IndexError:
                     print('Invalid KIC')
@@ -410,7 +391,7 @@ class InspectorGadget(object):
                 self._print_kic_stats(index)
 
             elif user_input == 's':
-                n_classed = np.sum(self.results['class'] != '-1')
+                n_classed = np.sum(self.results['class'][:] != '-1')
                 print('\n{} targets classified\n'.format(n_classed))
 
             else:
