@@ -46,6 +46,8 @@ class InspectorGadget(object):
     ----------
     pgram_file, acf_file : str
         Names of the HDF5 file containing the periodograms and ACFs.
+    kic_list : list of int, optional
+        Only display targets on this list.
     results_file : str, optional
         Specify an alternate HDF5 file for the inspection results.
     catalog_file : str, optional
@@ -67,7 +69,7 @@ class InspectorGadget(object):
     use_pdc : bool, optional
         Set to False to use SAP instead of PDC flux.
     """
-    def __init__(self, pgram_file, acf_file,
+    def __init__(self, pgram_file, acf_file, kic_list=None,
                  results_file='inspection_data.h5', catalog_file='kebc.csv',
                  sort_on='kic', class_filter=None, from_db=True, zoom_pan=0.05,
                  pgram_on=True, acf_on=True, phase_fold_on=False,
@@ -84,10 +86,14 @@ class InspectorGadget(object):
         self.results = h5py.File('{}/{}'.format(config.repo_data_dir, results_file),
                                  'r+')
 
-        if class_filter is not None:
-            keep = self.results['class'][:] == class_filter
+        if kic_list is not None:
+            keep = np.in1d(self.results['kic'], kic_list)
         else:
             keep = np.repeat(True, len(self.results['class'][:]))
+
+        if class_filter is not None:
+            keep2 = self.results['class'][:] == class_filter
+            keep = keep & keep2
 
         if sort_on[-2:] == '_r':
             # Reverse sort
