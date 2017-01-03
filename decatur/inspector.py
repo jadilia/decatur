@@ -103,7 +103,7 @@ class InspectorGadget(object):
             self.sort_indices = np.argsort(self.results[sort_on][:])[keep]
 
         # Find the last classified target.
-        classified = self.results['class'][:][keep] != '-1'
+        classified = self.results['class_v2'][:][keep] != '-1'
         if np.sum(classified) == 0:
             self.start_index = 0
         elif class_filter is not None:
