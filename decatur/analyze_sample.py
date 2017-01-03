@@ -418,3 +418,11 @@ def create_inspection_datafile(datafile='inspection_data.h5'):
     h5.create_dataset('kic', data=df['KIC'].values, dtype=np.uint64)
     h5.create_dataset('p_orb', data=df['period'].values, dtype=np.float64)
     h5.create_dataset('class', data=df['class'].values, dtype=dt)
+    h5.create_dataset('class_v2', data=np.repeat(b'-1', len(df)), dtype=dt)
+    h5.create_dataset('p_multi', data=np.repeat(b'-1', len(df)), dtype=dt)
+
+    acf = h5.create_group('acf')
+    acf.create_dataset('p_man', data=np.repeat(-99, len(df)), dtype=np.float64)
+
+    pgram = h5.create_group('pgram')
+    pgram.create_dataset('p_man', data=np.repeat(-99, len(df)), dtype=np.float64)

@@ -93,7 +93,7 @@ class InspectorGadget(object):
 
         if class_filter is not None:
             keep2 = self.results['class'][:] == class_filter
-            keep = keep & keep2
+            keep &= keep2
 
         if sort_on[-2:] == '_r':
             # Reverse sort
@@ -218,13 +218,19 @@ class InspectorGadget(object):
         """
         print('\nKIC {}'.format(self.results['kic'][index]))
         print('-----------------------------------')
-        print('P_orb    P_pgram     P_acf  class')
-        print('-----------------------------------')
-        header = '{:>6.2f}  {:>5.2f}  {:>5.2f}  {:>10s} \n'
-        print(header.format(self.results['p_orb'][index],
-                            self.results['pgram/p_rot_1'][index],
-                            self.results['acf/p_rot_1'][index],
-                            self.results['class'][index]))
+        print('P_orb: {:6.2f}\n'.format(self.results['p_orb'][index]))
+
+        print('{} ({})\n'.format(self.results['class_v2'][index],
+                                 self.results['class'][index]))
+
+        print('      P_auto   P_man')
+        print('LSP  {:5.2f}    {:5.2f}'.format(self.results['pgram/p_rot_1'][index],
+                                               self.results['pgram/p_man'][index]))
+        print('ACF  {:5.2f}    {:5.2f}'.format(self.results['acf/p_rot_1'][index],
+                                               self.results['acf/p_man'][index]))
+
+        print('\nMulti: {}'.format(self.results['p_multi'][index]))
+        print()
 
     def _update(self, index):
         """
@@ -303,13 +309,31 @@ class InspectorGadget(object):
             Index of the system in the results DataFrame
         """
         user_class = input('\nType of out-of-eclipse variability: ').lower()
-        self.results['class'][index] = str(user_class)
+        print()
 
-        alternate_p_rot = input('Alternate rotation period?: ').lower()
+        if user_class not in ['sp', 'ev', 'ot', 'fl']:
+            print('Invalid classification type.')
+            return
 
-        if alternate_p_rot == 'y':
-            user_p_rot = input('Rotation period: ')
-            # self.results.loc[index, 'p_rot_alt'] = float(user_p_rot)
+        self.results['class_v2'][index] = str(user_class)
+
+        if user_class == 'sp':
+            for metric, name in zip(['pgram', 'acf'], ['Periodogram', 'ACF']):
+                good = input('{} period correct?: '.format(name)).lower()
+
+                if good == 'y':
+                    self.results['{}/p_man'.format(metric)][index] = -1
+                elif good == 'n':
+                    p_man = input('Alternate {} period: '.format(name))
+                    self.results['{}/p_man'.format(metric)][index] = float(p_man)
+                print()
+
+            multi = input('Multiple possible periods?: ').lower()
+            if multi == 'y':
+                self.results['p_multi'][index] = 'y'
+                print('foo')
+            elif multi == 'n':
+                self.results['p_multi'][index] = 'n'
 
     def _key_press(self, event):
         """
@@ -355,6 +379,7 @@ class InspectorGadget(object):
 
         ii = np.where(self.sort_indices == self.start_index)[0][0]
         self._update(self.start_index)
+        index = self.start_index
 
         total_systems = len(self.sort_indices)
 
