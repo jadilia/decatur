@@ -105,12 +105,9 @@ class InspectorGadget(object):
         # Find the last classified target.
         classified = self.results['class_v2'][:][keep] != '-1'
         if np.sum(classified) == 0:
-            self.start_index = 0
-        elif class_filter is not None:
             self.start_index = self.sort_indices[0]
         else:
-            classified = self.sort_indices[classified]
-            self.start_index = classified[-1]
+            self.start_index = self.sort_indices[~classified][0]
 
         # Load the periodograms
         self.h5 = h5py.File('{}/{}'.format(config.data_dir, pgram_file))
