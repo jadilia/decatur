@@ -18,8 +18,7 @@ df = pd.DataFrame({'KIC': h5['kic'][:], 'corr': h5['corr/corr'][:]})
 kebc = utils.load_catalog()
 merge = pd.merge(kebc, df, on='KIC')
 
-keep = ((merge['morph'] > -0.1) & (merge['morph'] < 0.5) & (merge['corr'] < 1)) | \
-       ((merge['morph'] >= 0.5) & (merge['morph'] < 0.6) & (merge['corr'] < 0.95))
+keep = (merge['pwidth'] < 0.1) & (merge['corr'] < 0.95)
 
 merge['KIC'][keep].to_csv('{}/kic_keep.csv'.format(config.repo_data_dir),
                           index=False)
