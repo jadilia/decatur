@@ -422,8 +422,10 @@ class InspectorGadget(object):
                 self._print_kic_stats(index)
 
             elif user_input == 's':
-                n_classed = np.sum(self.results['class'][:] != '-1')
-                print('\n{} targets classified\n'.format(n_classed))
+                n_classed = np.sum(self.results['class_v2'][:] != '-1')
+                n_total = len(self.sort_indices)
+                print('\n{}/{} targets classified\n'.format(n_classed,
+                                                            n_total))
 
             else:
                 print('Input not understood')
