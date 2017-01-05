@@ -9,6 +9,7 @@ from __future__ import print_function, division, absolute_import
 import datetime
 import os
 
+import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -30,30 +31,29 @@ def plot_prot_porb(class_file, plot_file=None, catalog_file='kebc.csv'):
     catalog_file : str, optional
         Specify an alternate eclipsing binary catalog filename.
     """
-    join = utils.get_classification_results(class_file, catalog_file)
-
-    spot_mask = join['class'] == 'sp'
-    ev_mask = join['class'] == 'ev'
+    h5 = h5py.File('{}/{}'.format(repo_data_dir, class_file), 'r')
 
     fig, ax = plt.subplots()
 
-    p_orb_p_rot = join['period_x'] / join['p_rot_1']
+    checked = (h5['acf/p_man'][:] > -98) & (h5['class'][:] == 'sp')
 
-    colors = ['b', 'r']
-    labels = ['Ellipsoidals', 'Starspots']
+    p_rot = h5['acf/p_rot_1'][checked]
+    p_man = h5['acf/p_man'][checked]
+    p_man_true = p_man > 0
+    p_rot[p_man_true] = p_man[p_man_true]
 
-    for ii, mask in enumerate([ev_mask, spot_mask]):
-        ax.scatter(join['period_x'][mask], p_orb_p_rot[mask], color=colors[ii],
-                   s=5, label=labels[ii])
+    p_orb_p_rot = h5['p_orb'][checked] / p_rot
 
-    flat_mask = join['class'] == 'fl'
-    non_detections = np.repeat([5e-2], np.sum(flat_mask))
-    ax.scatter(join['period_x'][flat_mask], non_detections, color='g', s=5,
-               label='Non-detections')
+    for line in [0.5, 1, 2]:
+        ax.axhline(line, color='k', ls=':')
+
+    ax.scatter(h5['p_orb'][checked], p_orb_p_rot, color='r',
+               s=5, zorder=4)
 
     ax.set_xscale('log')
+    ax.set_yscale('log')
     ax.set_xlim(0.1, 100)
-    ax.set_ylim(0, 3)
+    ax.set_ylim(0.01, 100)
     ax.set_xlabel('$P_{orb}$ (days)')
     ax.set_ylabel('$P_{orb}/P_{rot}$')
     ax.minorticks_on()
@@ -61,8 +61,6 @@ def plot_prot_porb(class_file, plot_file=None, catalog_file='kebc.csv'):
     if plot_file is None:
         today = '{:%Y%m%d}'.format(datetime.date.today())
         plot_file = 'rotation_periods.{}.pdf'.format(today)
-
-    ax.legend(loc='upper left', scatterpoints=1, markerscale=4)
 
     plt.savefig('{}/{}'.format(data_dir, plot_file))
 
@@ -384,6 +382,7 @@ def class_examples(class_id='sp'):
         ax.set_ylabel('Relative Flux')
 
     plt.show()
+
 
 
 
