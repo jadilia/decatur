@@ -278,6 +278,7 @@ class InspectorGadget(object):
             self.acf_plot.set_xdata(lags)
             self.acf_plot.set_ydata(acf / acf.max())
             self.ax3.set_xlim(0, 45)
+            self.ax3.set_ylim(-1, 1)
 
             self.p_rot_line_3.set_xdata(self.results['acf/p_rot_1'][index])
             self.p_orb_line_3.set_xdata(self.results['p_orb'][index])
