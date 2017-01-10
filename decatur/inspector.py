@@ -142,6 +142,12 @@ class InspectorGadget(object):
 
         self.zoom_pan_axis = 1
 
+        self.xx = None
+        self.yy = None
+        self.fig_s = None
+        self.ax_s = None
+        self.click_point = None
+
     def _setup(self):
         """
         Setup the plot
@@ -429,3 +435,59 @@ class InspectorGadget(object):
                 print('Input not understood')
 
         plt.close()
+
+    def p_orb_p_rot(self):
+        """
+        Display light curves by selection on the P_orb/P_rot diagram.
+        """
+        self._setup()
+        self._update(self.start_index)
+
+        self.xx = self.results['p_orb'][:]
+        self.yy = self.results['p_orb'][:] / self.results['acf/p_rot_1'][:]
+
+        self.xx[~np.isfinite(self.xx)] = 0
+        self.yy[~np.isfinite(self.yy)] = 0
+
+        sp_mask = self.results['class'][:] == 'sp'
+        self.xx[~sp_mask] = -9
+        self.yy[~sp_mask] = -9
+
+        # Plot P_orb/P_rot vs. P_orb
+        self.fig_s, self.ax_s = plt.subplots()
+
+        self.ax_s.scatter(self.xx, self.yy, color='r')
+
+        for line in [0.5, 1, 2]:
+            self.ax_s.axhline(line, color='k', ls=':')
+
+        self.ax_s.set_xlabel('$P_{orb} (days)$')
+        self.ax_s.set_ylabel('$P_{orb}/P_{rot}$')
+        self.ax_s.set_xlim(0.1, 1000)
+        self.ax_s.set_ylim(0.01, 1000)
+        self.ax_s.set_xscale('log')
+        self.ax_s.set_yscale('log')
+
+        self.click_point, = self.ax_s.plot([0], [0], 'ok', zorder=2)
+
+        def on_click(event):
+
+            if event.dblclick:
+
+                ix = event.xdata
+                iy = event.ydata
+                inaxes = event.inaxes
+                if inaxes is not self.ax_s:
+                    return
+
+                closest = np.sqrt((self.xx - ix) ** 2 +
+                                  (self.yy - iy) ** 2).argmin()
+
+                self.click_point.set_xdata(self.xx[closest])
+                self.click_point.set_ydata(self.yy[closest])
+
+                self._update(closest)
+
+        self.fig_s.canvas.mpl_connect('button_press_event', on_click)
+
+        plt.show(block=True)
