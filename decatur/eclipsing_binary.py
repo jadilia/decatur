@@ -7,6 +7,7 @@ import warnings
 
 import interpacf
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import numpy as np
 from gatspy.periodic import LombScargleFast
 
@@ -113,6 +114,7 @@ class EclipsingBinary(object):
         self.acf = None
         self.peak_max = None
         self.all_peaks = None
+        self.peak_height = None
 
     @classmethod
     def from_kic(cls, kic, catalog_file='kebc.csv', use_pdc=True,
@@ -175,12 +177,16 @@ class EclipsingBinary(object):
             print('Returning empty BinaryParameters object.')
             return cls(light_curve, BinaryParameters())
 
-    def detrend_and_normalize(self, poly_order=3):
+    def normalize(self, detrend=True, poly_order=3):
         """
         Detrend and normalize light curve with a low order polynomial.
 
         Light curves are detrended on a per-quarter basis.
 
+        Parameters
+        ----------
+        detrend : bool, optional
+            Set to False to turn of polynomial detrending.
         poly_order: int, optional
             The order of the polynomial fit.
         """
@@ -194,17 +200,21 @@ class EclipsingBinary(object):
         for quarter in np.unique(self.l_curve.quarters):
             mask = self.l_curve.quarters == quarter
 
-            # Compute polynomial fit
-            poly = np.polyfit(self.l_curve.times[mask],
-                              self.l_curve.fluxes[mask], poly_order)
-            z = np.poly1d(poly)
-
             median_flux = np.nanmedian(self.l_curve.fluxes[mask])
 
-            # Subtract fit and median normalize
-            fluxes_detrended[mask] = (self.l_curve.fluxes[mask] -
-                                      z(self.l_curve.times[mask])) \
-                / median_flux
+            if detrend:
+                # Compute polynomial fit
+                poly = np.polyfit(self.l_curve.times[mask],
+                              self.l_curve.fluxes[mask], poly_order)
+                z = np.poly1d(poly)
+
+                # Subtract fit and median normalize
+                fluxes_detrended[mask] = (self.l_curve.fluxes[mask] -
+                                          z(self.l_curve.times[mask])) \
+                    / median_flux
+            else:
+                fluxes_detrended[mask] = (self.l_curve.fluxes[mask] -
+                                          median_flux) / median_flux
 
             flux_errs_normed[mask] = self.l_curve.flux_errs[mask] / median_flux
 
@@ -291,14 +301,19 @@ class EclipsingBinary(object):
                                                          self.l_curve.fluxes,
                                                          cadences=self.l_curve.cadences)
 
-    def find_acf_peaks(self):
+    def find_acf_peaks(self, plot=False):
         """
         Find the peaks in the autocorrelation function.
+
+        Parameters
+        ----------
+        plot : bool, optional
+            Set to True to make ACF plot.
         """
-        self.peak_max, self.all_peaks = interpacf.dominant_period(self.lags,
-                                                                  self.acf)
-    
-    def phase_evolution_plot(self, t_min = 0, t_max = 10000, period_fold = None):
+        returns = interpacf.dominant_period(self.lags, self.acf, plot=plot)
+        self.peak_max, self.all_peaks, self.peak_height = returns
+
+    def phase_evolution_plot(self, t_min=0., t_max=10000., period_fold=None):
         """
         Plot a phase folded light curve color coded by time.
 
@@ -310,8 +325,8 @@ class EclipsingBinary(object):
         """
         if period_fold is None:
             period_fold = self.params.p_orb
-        self.detrend_and_normalize()
         phase = self.phase_fold(period_fold = period_fold)
+        self.normalize()
         mask = (self.l_curve.times > t_min) & (self.l_curve.times < t_max)
         phase = phase[mask]
         fluxes = self.l_curve.fluxes[mask]
@@ -324,3 +339,128 @@ class EclipsingBinary(object):
         cbar = plt.colorbar()
         cbar.ax.set_ylabel('Days')
         plt.show()
+
+    def phase_fold_animation(self, period_fold=None, cad_min=3):
+        """
+        Animate phase-folded light curve versus time.
+
+        Parameters
+        ----------
+        period_fold : float, optional
+            Specify a different period at which to fold.
+        cad_min: int, optional
+            Exclude light curve sections with fewer cadences than `cad_min`.
+        """
+        # Calculate the phase.
+        if period_fold is None:
+            period_fold = self.params.p_orb
+        phase = self.phase_fold(period_fold=period_fold)
+        # Calculate the cycle number.
+        cycle = ((self.l_curve.times - self.params.bjd_0) //
+                 self.params.p_orb).astype(int)
+        # Start at zero
+        cycle -= cycle.min()
+
+        # Only use cycles with more cadences than `cad_min`.
+        cycle_num = np.arange(cycle.max() + 1)[np.bincount(cycle) > cad_min]
+
+        def data_gen():
+            for ii, nn in enumerate(cycle_num):
+
+                mask = np.abs(cycle - nn) <= 0
+
+                phase_section = phase[mask]
+                flux_section = self.l_curve.fluxes[mask]
+
+                phase_sort = np.argsort(phase_section)
+
+                yield phase_section[phase_sort], flux_section[phase_sort]
+
+        def init():
+            lt_zero = -self.l_curve.fluxes[self.l_curve.fluxes < 0]
+            flux_min = -1.1 * np.percentile(lt_zero, 99)
+            gt_zero = self.l_curve.fluxes[self.l_curve.fluxes > 0]
+            flux_max = 1.1 * np.percentile(gt_zero, 99)
+            ax.set_ylim(flux_min, flux_max)
+            ax.set_xlim(-0.1, 1.1)
+            ax.set_xlabel('Phase')
+            ax.set_ylabel('Relative Flux')
+
+            del xdata[:]
+            del ydata[:]
+
+            line.set_data(xdata, ydata)
+
+            return line,
+
+        fig, ax = plt.subplots()
+        line, = ax.plot([], [], color='k', lw=1)
+        xdata, ydata = [], []
+
+        def run(data):
+            # update the data
+            t, y = data
+            xdata = t
+            ydata = y
+
+            line.set_data(xdata, ydata)
+
+            return line,
+
+        ani = animation.FuncAnimation(fig, run, data_gen, blit=False,
+                                      interval=100, repeat=True,
+                                      init_func=init)
+        plt.show()
+
+    def eclipse_snr(self, cad_min=3):
+        """
+        Compute the eclipse signal-to-noise ratio.
+
+        Parameters
+        ----------
+        period_fold : float, optional
+            Specify a different period at which to fold.
+        cad_min: int, optional
+            Exclude light curve sections with fewer cadences than `cad_min`
+
+        """
+        # Calculate the phase.
+        phase = self.phase_fold()
+        # Calculate the cycle number.
+        cycle = ((self.l_curve.times - self.params.bjd_0) //
+                 self.params.p_orb).astype(int)
+        # Start at zero
+        cycle -= cycle.min()
+
+        # Only use cycles with more cadences than `cad_min`.
+        cycle_num = np.arange(cycle.max() + 1)[np.bincount(cycle) > cad_min]
+
+        dp = self.params.width_pri * 1.5
+        phase_bins = [0.5 - 1.5 * dp, 0.5 - 0.5 * dp, 0.5 + 0.5 * dp,
+                      0.5 + 1.5 * dp]
+
+        # phase_grid = np.linspace(phase_bins[0], phase_bins[3])
+
+        for ii, nn in enumerate(cycle_num):
+
+            mask = cycle == nn
+
+            p = phase[mask]
+            f = self.l_curve.fluxes[mask]
+
+            digitized = np.digitize(p, phase_bins)
+            to_fit = (digitized == 1) | (digitized == 3)
+
+            poly = np.polyfit(p[to_fit], f[to_fit], 3)
+            fit = np.poly1d(poly)
+
+            # plt.scatter(p, f, c=digitized, edgecolors='None', cmap='viridis')
+            # plt.plot(p[digitized == 1], f[digitized == 1], color='k')
+            # plt.plot(p[digitized == 3], f[digitized == 3], color='k')
+            # plt.plot(phase_grid, fit(phase_grid))
+            # plt.xlim(0, 1)
+
+            # for bin in phase_bins:
+            #     plt.axvline(bin)
+            #
+            # plt.show()

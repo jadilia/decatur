@@ -6,12 +6,9 @@ Visually inspect light curves and periodograms
 
 from __future__ import print_function, division, absolute_import
 
-import os
-
 from builtins import input
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import h5py
 
 from . import config, eclipsing_binary, utils
@@ -47,18 +44,18 @@ class InspectorGadget(object):
 
     Parameters
     ----------
-    pgram_results : str
-        Pickle file containing the rotation periods from periodograms.
-    acf_results : str
-        Pickle file containing the rotation periods from ACFs.
-    pgram_file : str
-        Name of the HDF5 file containing the periodograms.
-    results_file : str
-        Specify an alternate pickle file for the inspection results.
+    pgram_file, acf_file : str
+        Names of the HDF5 file containing the periodograms and ACFs.
+    kic_list : list of int, optional
+        Only display targets on this list.
+    results_file : str, optional
+        Specify an alternate HDF5 file for the inspection results.
     catalog_file : str, optional
         Specify an alternate eclipsing binary catalog filename.
     sort_on : str, optional
         Sort by a column in the KEBC. Must be a valid column name.
+    class_filter : str, optional
+        If not None, only light curves of this class will be shown.
     from_db : bool, optional
         Set to False to load data from MAST instead of local database.
     zoom_pan : float, optional
@@ -67,13 +64,16 @@ class InspectorGadget(object):
         Set to False to turn periodogram plot off.
     acf_on : bool, optional
         Set to False to turn ACF plot off.
+    phase_fold_on : bool, optional
+        Set to True to show window with phase_folded light curve.
     use_pdc : bool, optional
         Set to False to use SAP instead of PDC flux.
     """
-    def __init__(self, pgram_results, acf_results, pgram_file, acf_file,
-                 results_file='inspect.pkl', catalog_file='kebc.csv',
-                 sort_on='KIC', from_db=True, zoom_pan=0.05, pgram_on=True,
-                 acf_on=True, use_pdc=True):
+    def __init__(self, pgram_file, acf_file, kic_list=None,
+                 results_file='inspection_data.h5', catalog_file='kebc.csv',
+                 sort_on='kic', class_filter=None, from_db=True, zoom_pan=0.05,
+                 pgram_on=True, acf_on=True, phase_fold_on=False,
+                 use_pdc=True):
         self.catalog_file = catalog_file
         self.from_db = from_db
         self.zoom_pan = zoom_pan
@@ -81,31 +81,33 @@ class InspectorGadget(object):
         self.acf_on = acf_on
         self.subplot_list = ['1', '2', '3']
         self.use_pdc = use_pdc
+        self.phase_fold_on = phase_fold_on
 
-        merge = utils.merge_catalogs(catalog_file, pgram_results, acf_results)
+        self.results = h5py.File('{}/{}'.format(config.repo_data_dir, results_file),
+                                 'r+')
 
-        self.results_file = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                                         'data', results_file))
-        if os.path.exists(self.results_file):
-            self.results = pd.read_pickle(self.results_file)
+        if kic_list is not None:
+            keep = np.in1d(self.results['kic'], kic_list)
         else:
-            self.results = _create_results_file(merge)
-            self.results.to_pickle(self.results_file)
+            keep = np.repeat(True, len(self.results['class'][:]))
+
+        if class_filter is not None:
+            keep2 = self.results['class'][:] == class_filter
+            keep &= keep2
 
         if sort_on[-2:] == '_r':
             # Reverse sort
             sort_on = sort_on[:-2]
-            self.sort_indices = np.argsort(self.results[sort_on].values)[::-1]
+            self.sort_indices = np.argsort(self.results[sort_on][:])[keep][::-1]
         else:
-            self.sort_indices = np.argsort(self.results[sort_on].values)
+            self.sort_indices = np.argsort(self.results[sort_on][:])[keep]
 
-        # Find the last classified light target
-        classified = self.results['class'] != '-1'
+        # Find the last classified target.
+        classified = self.results['class_v2'][:][keep] != '-1'
         if np.sum(classified) == 0:
-            self.start_index = 0
+            self.start_index = self.sort_indices[0]
         else:
-            classified = self.results[sort_on][self.sort_indices][classified]
-            self.start_index = classified.index[-1]
+            self.start_index = self.sort_indices[~classified][0]
 
         # Load the periodograms
         self.h5 = h5py.File('{}/{}'.format(config.data_dir, pgram_file))
@@ -122,9 +124,11 @@ class InspectorGadget(object):
         self.acf = [0]
 
         self.fig = None
+        self.fig2 = None
         self.ax1 = None
         self.ax2 = None
         self.ax3 = None
+        self.ax4 = None
         self.fig_number = None
 
         self.light_curve = None
@@ -135,9 +139,14 @@ class InspectorGadget(object):
         self.p_rot_line_2 = None
         self.p_orb_line_3 = None
         self.p_rot_line_3 = None
-        self.peak_1_line = None
 
         self.zoom_pan_axis = 1
+
+        self.xx = None
+        self.yy = None
+        self.fig_s = None
+        self.ax_s = None
+        self.click_point = None
 
     def _setup(self):
         """
@@ -157,6 +166,14 @@ class InspectorGadget(object):
         else:
             self.fig, (self.ax1, self.ax2, self.ax3) = plt.subplots(nrows=3,
                                                                     figsize=(7, 12))
+
+        if self.phase_fold_on:
+            self.fig2, self.ax4 = plt.subplots()
+            self.phase_fold_plot = self.ax4.scatter([0], [0], color='k', s=0.1)
+            self.ax4.set_xlim(-0.1, 1.1)
+            self.ax4.set_xlabel('Phase')
+            self.ax4.set_ylabel('Relative Flux')
+
         # Use this later to check if the window has been closed.
         self.fig_number = self.fig.number
 
@@ -187,9 +204,8 @@ class InspectorGadget(object):
             self.ax3.set_xlabel('Lag (days)')
             self.ax3.set_ylabel('ACF')
 
-            # Vertical lines a orbital period, first peak, and highest peak
+            # Vertical lines a orbital period and highest peak
             self.p_rot_line_3 = self.ax3.axvline(0, color='r')
-            self.peak_1_line = self.ax3.axvline(0, color='g')
             self.p_orb_line_3 = self.ax3.axvline(0, color='b')
         else:
             self.subplot_list.remove('3')
@@ -203,15 +219,21 @@ class InspectorGadget(object):
         index : int
             Index of the system in the results DataFrame.
         """
-        print('\nKIC {}'.format(self.results['KIC'][index]))
+        print('\nKIC {}'.format(self.results['kic'][index]))
         print('-----------------------------------')
-        print('P_orb    P_rot     class  p_rot_alt')
-        print('-----------------------------------')
-        header = '{:>6.2f}  {:>5.2f}  {:>10s}  {:>5.2f} \n'
-        print(header.format(self.results['period'][index],
-                            self.results['p_rot_1'][index],
-                            self.results['class'][index],
-                            self.results['p_rot_alt'][index]))
+        print('P_orb: {:6.2f}\n'.format(self.results['p_orb'][index]))
+
+        print('{} ({})\n'.format(self.results['class_v2'][index],
+                                 self.results['class'][index]))
+
+        print('      P_auto   P_man')
+        print('LSP  {:5.2f}    {:5.2f}'.format(self.results['pgram/p_rot_1'][index],
+                                               self.results['pgram/p_man'][index]))
+        print('ACF  {:5.2f}    {:5.2f}'.format(self.results['acf/p_rot_1'][index],
+                                               self.results['acf/p_man'][index]))
+
+        print('\nMulti: {}'.format(self.results['p_multi'][index]))
+        print()
 
     def _update(self, index):
         """
@@ -227,13 +249,13 @@ class InspectorGadget(object):
 
         self.zoom_pan_axis = 1
 
-        kic = self.results['KIC'][index]
+        kic = self.results['kic'][index]
 
         eb = eclipsing_binary.EclipsingBinary.from_kic(kic,
                                                        catalog_file=self.catalog_file,
                                                        from_db=self.from_db,
                                                        use_pdc=self.use_pdc)
-        eb.detrend_and_normalize()
+        eb.normalize()
 
         self.light_curve.set_xdata(eb.l_curve.times)
         self.light_curve.set_ydata(eb.l_curve.fluxes)
@@ -253,19 +275,29 @@ class InspectorGadget(object):
             self.ax2.set_xlim(0, 45)
             self.ax2.set_ylim(0, 1.1 * powers.max())
 
-            self.p_rot_line_2.set_xdata(self.results['p_rot_1'][index])
-            self.p_orb_line_2.set_xdata(self.results['period'][index])
+            self.p_rot_line_2.set_xdata(self.results['pgram/p_rot_1'][index])
+            self.p_orb_line_2.set_xdata(self.results['p_orb'][index])
 
         if self.acf_on:
             lags = self.h5_acf['{}/lags'.format(kic)][:]
             acf = self.h5_acf['{}/acf'.format(kic)][:]
             self.acf_plot.set_xdata(lags)
             self.acf_plot.set_ydata(acf / acf.max())
-            self.ax3.set_xlim(0, 4 * self.results['period'][index])
+            self.ax3.set_xlim(0, 45)
+            self.ax3.set_ylim(-1, 1)
 
-            self.peak_1_line.set_xdata(self.results['peak_1'][index])
-            self.p_rot_line_3.set_xdata(self.results['peak_max'][index])
-            self.p_orb_line_3.set_xdata(self.results['period'][index])
+            self.p_rot_line_3.set_xdata(self.results['acf/p_rot_1'][index])
+            self.p_orb_line_3.set_xdata(self.results['p_orb'][index])
+
+        if self.phase_fold_on:
+            phase = eb.phase_fold()
+
+            self.phase_fold_plot.set_offsets(np.hstack((phase[:, None],
+                                                        eb.l_curve.fluxes[:, None])))
+            ymin = -1.1 * np.percentile(-eb.l_curve.fluxes[eb.l_curve.fluxes < 0], 99)
+            ymax = 1.5 * np.percentile(eb.l_curve.fluxes[eb.l_curve.fluxes > 0], 99)
+
+            self.ax4.set_ylim(ymin, ymax)
 
         self.fig.canvas.draw()
 
@@ -281,15 +313,31 @@ class InspectorGadget(object):
             Index of the system in the results DataFrame
         """
         user_class = input('\nType of out-of-eclipse variability: ').lower()
-        self.results.loc[index, 'class'] = str(user_class)
+        print()
 
-        alternate_p_rot = input('Alternate rotation period?: ').lower()
+        if user_class not in ['sp', 'ev', 'ot', 'fl']:
+            print('Invalid classification type.')
+            return
 
-        if alternate_p_rot == 'y':
-            user_p_rot = input('Rotation period: ')
-            self.results.loc[index, 'p_rot_alt'] = float(user_p_rot)
+        self.results['class_v2'][index] = str(user_class)
 
-        self.results.to_pickle(self.results_file)
+        if user_class == 'sp':
+            for metric, name in zip(['pgram', 'acf'], ['Periodogram', 'ACF']):
+                good = input('{} period correct?: '.format(name)).lower()
+
+                if good == 'y':
+                    self.results['{}/p_man'.format(metric)][index] = -1
+                elif good == 'n':
+                    p_man = input('Alternate {} period: '.format(name))
+                    self.results['{}/p_man'.format(metric)][index] = float(p_man)
+                print()
+
+            multi = input('Multiple possible periods?: ').lower()
+            if multi == 'y':
+                self.results['p_multi'][index] = 'y'
+                print('foo')
+            elif multi == 'n':
+                self.results['p_multi'][index] = 'n'
 
     def _key_press(self, event):
         """
@@ -335,6 +383,9 @@ class InspectorGadget(object):
 
         ii = np.where(self.sort_indices == self.start_index)[0][0]
         self._update(self.start_index)
+        index = self.start_index
+
+        total_systems = len(self.sort_indices)
 
         while True:
 
@@ -343,7 +394,7 @@ class InspectorGadget(object):
             if user_input == '':
                 continue
             elif user_input == 'n':
-                if ii + 2 > len(self.results['KIC']):
+                if ii + 2 > total_systems:
                     print('Reached end of catalog')
                 else:
                     ii += 1
@@ -363,7 +414,7 @@ class InspectorGadget(object):
 
             elif utils.is_int(user_input):
                 try:
-                    index = np.where(int(user_input) == self.results['KIC'])[0][0]
+                    index = np.where(int(user_input) == self.results['kic'][:])[0][0]
                     ii = np.where(self.sort_indices == index)[0][0]
                 except IndexError:
                     print('Invalid KIC')
@@ -375,10 +426,68 @@ class InspectorGadget(object):
                 self._print_kic_stats(index)
 
             elif user_input == 's':
-                n_classed = np.sum(self.results['class'] != '-1')
-                print('\n{} targets classified\n'.format(n_classed))
+                n_classed = np.sum(self.results['class_v2'][:] != '-1')
+                n_total = len(self.sort_indices)
+                print('\n{}/{} targets classified\n'.format(n_classed,
+                                                            n_total))
 
             else:
                 print('Input not understood')
 
         plt.close()
+
+    def p_orb_p_rot(self):
+        """
+        Display light curves by selection on the P_orb/P_rot diagram.
+        """
+        self._setup()
+        self._update(self.start_index)
+
+        self.xx = self.results['p_orb'][:]
+        self.yy = self.results['p_orb'][:] / self.results['acf/p_rot_1'][:]
+
+        self.xx[~np.isfinite(self.xx)] = 0
+        self.yy[~np.isfinite(self.yy)] = 0
+
+        sp_mask = self.results['class'][:] == 'sp'
+        self.xx[~sp_mask] = -9
+        self.yy[~sp_mask] = -9
+
+        # Plot P_orb/P_rot vs. P_orb
+        self.fig_s, self.ax_s = plt.subplots()
+
+        self.ax_s.scatter(self.xx, self.yy, color='r')
+
+        for line in [0.5, 1, 2]:
+            self.ax_s.axhline(line, color='k', ls=':')
+
+        self.ax_s.set_xlabel('$P_{orb} (days)$')
+        self.ax_s.set_ylabel('$P_{orb}/P_{rot}$')
+        self.ax_s.set_xlim(0.1, 1000)
+        self.ax_s.set_ylim(0.01, 1000)
+        self.ax_s.set_xscale('log')
+        self.ax_s.set_yscale('log')
+
+        self.click_point, = self.ax_s.plot([0], [0], 'ok', zorder=2)
+
+        def on_click(event):
+
+            if event.dblclick:
+
+                ix = event.xdata
+                iy = event.ydata
+                inaxes = event.inaxes
+                if inaxes is not self.ax_s:
+                    return
+
+                closest = np.sqrt((self.xx - ix) ** 2 +
+                                  (self.yy - iy) ** 2).argmin()
+
+                self.click_point.set_xdata(self.xx[closest])
+                self.click_point.set_ydata(self.yy[closest])
+
+                self._update(closest)
+
+        self.fig_s.canvas.mpl_connect('button_press_event', on_click)
+
+        plt.show(block=True)

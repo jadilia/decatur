@@ -16,8 +16,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy import stats, interpolate
 
-from . import eclipsing_binary, kepler_data, utils
-from .config import data_dir
+from . import eclipsing_binary, kepler_data
+from .config import data_dir, repo_data_dir
 
 
 def compute_periodicity(kind, width_max=0.25, period_min=0.01, period_max=100.,
@@ -75,7 +75,7 @@ def compute_periodicity(kind, width_max=0.25, period_min=0.01, period_max=100.,
     for ii, kic in enumerate(kics):
         eb = eclipsing_binary.EclipsingBinary.from_kic(kic, from_db=from_db)
 
-        eb.detrend_and_normalize()
+        eb.normalize()
 
         if eb.params.width_pri < width_max:
             eb.interpolate_over_eclipse(window=window)
@@ -104,7 +104,8 @@ def compute_periodicity(kind, width_max=0.25, period_min=0.01, period_max=100.,
     h5.close()
 
 
-def measure_rotation_periods(periodograms_file, results_file=None,
+def measure_rotation_periods(periodograms_file,
+                             class_datafile='inspection_data.h5',
                              period_min=0.01, period_max=100.):
     """
     Measure rotation periods for the Kepler eclipsing binary sample.
@@ -113,54 +114,53 @@ def measure_rotation_periods(periodograms_file, results_file=None,
     ----------
     periodograms_file : str
         HD5F file containing the periodograms.
-    results_file : str, optional
-        Specify an alternate output results filename.
+    class_datafile : str, optional
+        The HDF5 file to store the rotation periods in.
     period_min, period_max : float, optional
         Will only search for `period_min` < period < `period_max`
     """
-    h5 = h5py.File('{}/{}'.format(data_dir, periodograms_file), 'r')
+    h5_pgram = h5py.File('{}/{}'.format(data_dir, periodograms_file), 'r')
+    h5_class = h5py.File('{}/{}'.format(repo_data_dir, class_datafile), 'r+')
 
-    kics = np.array(h5.keys(), dtype=np.int64)
+    kics = np.array(h5_class['kic'][:], dtype=np.int64)
 
-    dtypes = [('KIC', np.uint64), ('p_rot_1', np.float64),
-              ('peak_power_1', np.float64), ('cross_corr_1', np.float64)]
-    rec_array = np.recarray(len(kics), dtype=dtypes)
+    p_rot_1 = np.zeros(len(kics), dtype=np.float64)
+    peak_power_1 = np.zeros_like(p_rot_1)
 
     total_systems = len(kics)
     print('Measuring rotation periods for {} systems...'.format(total_systems))
 
     for ii, kic in enumerate(kics):
 
-        periods = h5['{}/periods'.format(kic)][:]
-        powers = h5['{}/powers'.format(kic)][:]
+        periods = h5_pgram['{}/periods'.format(kic)][:]
+        powers = h5_pgram['{}/powers'.format(kic)][:]
 
         keep = (periods > period_min) & (periods < period_max)
 
         index_max = np.argmax(powers[keep])
 
-        p_rot_1 = periods[keep][index_max]
-
-        eb = eclipsing_binary.EclipsingBinary.from_kic(kic)
-        corr = phase_correlation(eb.l_curve.times, eb.l_curve.fluxes,
-                                 p_fold=p_rot_1, t_0=eb.params.bjd_0)[1]
-        cross_corr_1 = np.nanmedian(corr)
-
-        rec_array[ii]['KIC'] = kic
-        rec_array[ii]['p_rot_1'] = p_rot_1
-        rec_array[ii]['peak_power_1'] = powers[keep][index_max]
-        rec_array[ii]['cross_corr_1'] = cross_corr_1
+        p_rot_1[ii] = periods[keep][index_max]
+        peak_power_1[ii] = powers[keep][index_max]
 
         sys.stdout.write('\r{:.1f}% complete'.format((ii + 1) * 100 / total_systems))
         sys.stdout.flush()
 
     print()
 
-    if results_file is None:
-        today = '{:%Y%m%d}'.format(datetime.date.today())
-        results_file = 'rotation_periods.{}.pkl'.format(today)
+    if 'pgram' in list(h5_class.keys()):
+        pgram = h5_class['pgram']
+    else:
+        pgram = h5_class.create_group('pgram')
 
-    df = pd.DataFrame(data=rec_array)
-    df.to_pickle('{}/{}'.format(data_dir, results_file))
+    for dataset in ['p_rot_1', 'peak_power_1']:
+        if dataset in list(pgram.keys()):
+            dset = pgram[dataset]
+            dset[...] = eval(dataset)
+        else:
+            pgram.create_dataset(dataset, data=eval(dataset))
+
+    pgram.attrs['run_time'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    pgram.attrs['width_max'] = h5_pgram.attrs['width_max']
 
 
 def phase_folded_median(phase, fluxes, delta_phase):
@@ -287,7 +287,8 @@ def phase_correlation(times, fluxes, p_fold, t_0=0., delta_phase=0.01,
     return cycle_num, corr
 
 
-def correlation_at_p_orb(width_max=0.25, savefile=None):
+def correlation_at_p_orb(width_max=0.25, class_datafile='inspection_data.h5',
+                         detrend=True):
     """
     Compute the cross correlation with the median light curve folded at the
     orbital period.
@@ -297,21 +298,24 @@ def correlation_at_p_orb(width_max=0.25, savefile=None):
     width_max : float, optional
         Eclipses will be interpolated over if the primary phase width
         is less than `width_max`.
-    savefile : str, optional
-        Specify an alternate output file.
+    class_datafile : str, optional
+        The HDF5 file to store the rotation periods in.
+    detrend : bool, optional
+        Set to False to not detrend light curves.
     """
-    kebc = utils.load_catalog()
-    kics = kebc['KIC']
+    h5 = h5py.File('{}/{}'.format(repo_data_dir, class_datafile), 'r+')
 
-    correlations = np.zeros(len(kebc), dtype=float) - 1.
+    kics = h5['kic']
+
+    correlations = np.zeros(len(kics), dtype=float) - 1.
 
     total_systems = len(kics)
-    print('Measuring rotation periods for {} systems...'.format(total_systems))
+    print('Measuring phase correlation for {} systems...'.format(total_systems))
 
     for ii, kic in enumerate(kics):
 
         eb = eclipsing_binary.EclipsingBinary.from_kic(kic)
-        eb.detrend_and_normalize()
+        eb.normalize(detrend=detrend)
 
         if eb.params.width_pri < width_max:
             eb.interpolate_over_eclipse()
@@ -326,13 +330,23 @@ def correlation_at_p_orb(width_max=0.25, savefile=None):
 
     print()
 
-    if savefile is None:
-        savefile = 'corr_at_p_orb.npy'
+    if 'corr' in list(h5.keys()):
+        group = h5['corr']
+    else:
+        group = h5.create_group('corr')
 
-    np.save('{}/{}'.format(data_dir, savefile), [kics, correlations])
-    
+    if 'corr' in list(group.keys()):
+        dset = group['corr']
+        dset[...] = eval('correlations')
+    else:
+        group.create_dataset('corr', data=eval('correlations'))
 
-def find_acf_peaks(acf_file, results_file=None):
+    group.attrs['run_time'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    group.attrs['width_max'] = width_max
+    group.attrs['detrend'] = detrend
+
+
+def find_acf_peaks(acf_file, class_datafile='inspection_data.h5'):
     """
     Find peaks in the auto-correlation function (ACF).
 
@@ -342,42 +356,73 @@ def find_acf_peaks(acf_file, results_file=None):
     ----------
     acf_file : str
         HDF5 file containing the ACFs.
-    results_file : str, optional
-        Specify an alternate output results filename.
+    class_datafile : str, optional
+        The HDF5 file to store the rotation periods in.
     """
-    h5 = h5py.File('{}/{}'.format(data_dir, acf_file), 'r')
+    h5_acf = h5py.File('{}/{}'.format(data_dir, acf_file), 'r')
+    h5_class = h5py.File('{}/{}'.format(repo_data_dir, class_datafile))
 
-    kics = np.array(h5.keys(), dtype=np.int64)
+    kics = h5_class['kic'][:]
 
-    dtypes = [('KIC', np.uint64), ('peak_1', np.float64),
-              ('peak_2', np.float64), ('peak_3', np.float64),
-              ('peak_4', np.float64), ('peak_max', np.float64)]
-    rec_array = np.recarray(len(kics), dtype=dtypes)
+    p_rot_1 = np.zeros(len(kics), dtype=np.float64)
+    peak_height_1 = np.zeros_like(p_rot_1)
 
     total_systems = len(kics)
     print('Finding ACF peaks for {} systems...'.format(total_systems))
 
     for ii, kic in enumerate(kics):
 
-        lags = h5['{}/lags'.format(kic)][:]
-        acf = h5['{}/acf'.format(kic)][:]
+        lags = h5_acf['{}/lags'.format(kic)][:]
+        acf = h5_acf['{}/acf'.format(kic)][:]
 
-        peak_max, peaks = interpacf.dominant_period(lags, acf)
+        peak_max, peaks, h_p = interpacf.dominant_period(lags, acf)
 
-        rec_array[ii]['KIC'] = kic
-        rec_array[ii]['peak_max'] = peak_max
-
-        for jj in range(len(peaks))[:4]:
-            rec_array[ii]['peak_{}'.format(jj + 1)] = peaks[jj]
+        p_rot_1[ii] = peak_max
+        peak_height_1[ii] = h_p
 
         sys.stdout.write('\r{:.1f}% complete'.format((ii + 1) * 100 / total_systems))
         sys.stdout.flush()
 
     print()
 
-    if results_file is None:
-        today = '{:%Y%m%d}'.format(datetime.date.today())
-        results_file = 'acf_peaks.{}.pkl'.format(today)
+    if 'acf' in list(h5_class.keys()):
+        acf = h5_class['acf']
+    else:
+        acf = h5_class.create_group('acf')
 
-    df = pd.DataFrame(data=rec_array)
-    df.to_pickle('{}/{}'.format(data_dir, results_file))
+    for dataset in ['p_rot_1', 'peak_height_1']:
+        if dataset in list(acf.keys()):
+            dset = acf[dataset]
+            dset[...] = eval(dataset)
+        else:
+            acf.create_dataset(dataset, data=eval(dataset))
+
+    acf.attrs['run_time'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    acf.attrs['width_max'] = h5_acf.attrs['width_max']
+
+
+def create_inspection_datafile(datafile='inspection_data.h5'):
+    """
+    Create an HDF5 file to store the classification data.
+
+    Parameters
+    ----------
+    datafile : str, optional
+        Specify an alternate datafile name.
+    """
+    df = pd.read_csv('{}/{}'.format(repo_data_dir, 'initial_class.csv'))
+
+    dt = h5py.special_dtype(vlen=str)
+
+    h5 = h5py.File('{}/{}'.format(repo_data_dir, datafile), mode='x')
+    h5.create_dataset('kic', data=df['KIC'].values, dtype=np.uint64)
+    h5.create_dataset('p_orb', data=df['period'].values, dtype=np.float64)
+    h5.create_dataset('class', data=df['class'].values, dtype=dt)
+    h5.create_dataset('class_v2', data=np.repeat(b'-1', len(df)), dtype=dt)
+    h5.create_dataset('p_multi', data=np.repeat(b'-1', len(df)), dtype=dt)
+
+    acf = h5.create_group('acf')
+    acf.create_dataset('p_man', data=np.repeat(-99, len(df)), dtype=np.float64)
+
+    pgram = h5.create_group('pgram')
+    pgram.create_dataset('p_man', data=np.repeat(-99, len(df)), dtype=np.float64)
