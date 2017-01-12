@@ -87,7 +87,7 @@ class InspectorGadget(object):
                                  'r+')
 
         if kic_list is not None:
-            keep = np.in1d(self.results['kic'], kic_list)
+            keep = np.in1d(self.results['kic'][:], kic_list)
         else:
             keep = np.repeat(True, len(self.results['class'][:]))
 
@@ -95,19 +95,24 @@ class InspectorGadget(object):
             keep2 = self.results['class'][:] == class_filter
             keep &= keep2
 
+        # Reference indicies in ascending order
+        ref_indices = np.arange(0, len(keep))
+
         if sort_on[-2:] == '_r':
             # Reverse sort
             sort_on = sort_on[:-2]
-            self.sort_indices = np.argsort(self.results[sort_on][:])[keep][::-1]
+            sorted = np.argsort(self.results[sort_on][:])[::-1]
         else:
-            self.sort_indices = np.argsort(self.results[sort_on][:])[keep]
+            sorted = np.argsort(self.results[sort_on][:])
+
+        self.sort_indices = sorted[np.in1d(sorted, ref_indices[keep])]
 
         # Find the last classified target.
-        classified = self.results['class_v2'][:][keep] != '-1'
+        classified = self.results['class_v2'][keep] != '-1'
         if np.sum(classified) == 0:
             self.start_index = self.sort_indices[0]
         else:
-            self.start_index = self.sort_indices[~classified][0]
+            self.start_index = self.sort_indices[classified][-1]
 
         # Load the periodograms
         self.h5 = h5py.File('{}/{}'.format(config.data_dir, pgram_file))
@@ -193,6 +198,7 @@ class InspectorGadget(object):
             # Vertical lines at the measured rotation period and orbital period
             self.p_rot_line_2 = self.ax2.axvline(0, color='r')
             self.p_orb_line_2 = self.ax2.axvline(0, color='b')
+            self.p_final_line_2 = self.ax2.axvline(0, color='g', lw=2, ls='--')
         else:
             self.subplot_list.remove('2')
 
@@ -207,6 +213,7 @@ class InspectorGadget(object):
             # Vertical lines a orbital period and highest peak
             self.p_rot_line_3 = self.ax3.axvline(0, color='r')
             self.p_orb_line_3 = self.ax3.axvline(0, color='b')
+            self.p_final_line_3 = self.ax3.axvline(0, color='g', lw=2, ls='--')
         else:
             self.subplot_list.remove('3')
 
@@ -278,6 +285,11 @@ class InspectorGadget(object):
             self.p_rot_line_2.set_xdata(self.results['pgram/p_rot_1'][index])
             self.p_orb_line_2.set_xdata(self.results['p_orb'][index])
 
+            if self.results['pgram/p_man'][index] < -0.5:
+                self.p_final_line_2.set_xdata(self.results['pgram/p_rot_1'][index])
+            else:
+                self.p_final_line_2.set_xdata(self.results['pgram/p_man'][index])
+
         if self.acf_on:
             lags = self.h5_acf['{}/lags'.format(kic)][:]
             acf = self.h5_acf['{}/acf'.format(kic)][:]
@@ -288,6 +300,11 @@ class InspectorGadget(object):
 
             self.p_rot_line_3.set_xdata(self.results['acf/p_rot_1'][index])
             self.p_orb_line_3.set_xdata(self.results['p_orb'][index])
+
+            if self.results['acf/p_man'][index] < -0.5:
+                self.p_final_line_3.set_xdata(self.results['acf/p_rot_1'][index])
+            else:
+                self.p_final_line_3.set_xdata(self.results['acf/p_man'][index])
 
         if self.phase_fold_on:
             phase = eb.phase_fold()
