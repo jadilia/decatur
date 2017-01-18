@@ -119,6 +119,8 @@ class InspectorGadget(object):
 
         self.h5_acf = h5py.File('{}/{}'.format(config.data_dir, acf_file))
 
+        self.kebc = utils.load_catalog(self.catalog_file)
+
         self.times = [0]
         self.fluxes = [0]
 
@@ -228,7 +230,13 @@ class InspectorGadget(object):
         """
         print('\nKIC {}'.format(self.results['kic'][index]))
         print('-----------------------------------')
-        print('P_orb: {:6.2f}\n'.format(self.results['p_orb'][index]))
+        print('P_orb: {:6.2f}'.format(self.results['p_orb'][index]))
+
+        kic_str = self.kebc.loc[self.kebc['KIC'] == self.results['kic'][index]]['kmag']
+        print('K_mag: {}'.format(kic_str.values[0]))
+
+        teff_str = self.kebc.loc[self.kebc['KIC'] == self.results['kic'][index]]['Teff']
+        print('T_eff: {:.0f}\n'.format(teff_str.values[0]))
 
         print('{} ({})\n'.format(self.results['class_v2'][index],
                                  self.results['class'][index]))
