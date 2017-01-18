@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division, print_function
 
 import os
+import platform
 import sys
 
 os.environ['MPLBACKEND'] = 'TkAgg'
@@ -23,7 +24,16 @@ keep = (merge['pwidth'] < 0.1) & (merge['corr'] < 0.95)
 merge['KIC'][keep].to_csv('{}/kic_keep.csv'.format(config.repo_data_dir),
                           index=False)
 
+# Setup to run on my laptop
+if platform.system() == 'Darwin':
+    from_db = False
+    zoom_pan = 0.15
+else:
+    from_db = True
+    zoom_pan = 0.05
+
 gadget = decatur.inspector.InspectorGadget('periodograms.20160929.h5',
                                            'acfs.20161108.h5',
-                                           kic_list=merge['KIC'][keep].values)
+                                           kic_list=merge['KIC'][keep].values,
+                                           from_db=from_db, zoom_pan=zoom_pan)
 gadget.gogo_gadget()
