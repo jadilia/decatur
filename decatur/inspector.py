@@ -249,6 +249,7 @@ class InspectorGadget(object):
                                                self.results['acf/p_man'][index]))
 
         print('\nMulti: {}'.format(self.results['p_multi'][index]))
+        print('\nBad data: {}'.format(self.results['bad_data'][index]))
         print()
 
     def _update(self, index):
@@ -361,9 +362,14 @@ class InspectorGadget(object):
             multi = input('Multiple possible periods?: ').lower()
             if multi == 'y':
                 self.results['p_multi'][index] = 'y'
-                print('foo')
             elif multi == 'n':
                 self.results['p_multi'][index] = 'n'
+
+            bad_data = input('Bad light curve segments?: ').lower()
+            if bad_data == 'y':
+                self.results['bad_data'][index] = 1
+            elif bad_data == 'n':
+                self.results['bad_data'][index] = 0
 
     def _key_press(self, event):
         """
