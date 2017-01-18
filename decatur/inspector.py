@@ -173,6 +173,7 @@ class InspectorGadget(object):
         else:
             self.fig, (self.ax1, self.ax2, self.ax3) = plt.subplots(nrows=3,
                                                                     figsize=(7, 12))
+            self.fig.subplots_adjust(bottom=0.01, top=0.99, hspace=0.1)
 
         if self.phase_fold_on:
             self.fig2, self.ax4 = plt.subplots()
@@ -340,7 +341,7 @@ class InspectorGadget(object):
         user_class = input('\nType of out-of-eclipse variability: ').lower()
         print()
 
-        if user_class not in ['sp', 'ev', 'ot', 'fl']:
+        if user_class not in ['sp', 'sp?', 'ev', 'ot', 'fl']:
             print('Invalid classification type.')
             return
 
