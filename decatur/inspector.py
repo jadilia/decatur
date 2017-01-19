@@ -230,6 +230,8 @@ class InspectorGadget(object):
             Index of the system in the results DataFrame.
         """
         print('\nKIC {}'.format(self.results['kic'][index]))
+        url = 'http://keplerebs.villanova.edu/overview/?k={}'.format(self.results['kic'][index])
+        print(url)
         print('-----------------------------------')
         print('P_orb: {:6.2f}'.format(self.results['p_orb'][index]))
 
