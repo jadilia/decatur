@@ -214,7 +214,7 @@ def loadlc(kic, use_pdc=True, long_cadence=True, from_db=True,
         client = kplr.API()
 
         light_curves = client.light_curves(kepler_id=kic, fetch=fetch,
-                                           short_cadence=~long_cadence)
+                                           short_cadence=(not long_cadence))
 
         times, fluxes, flux_errs = [], [], []
         flags, cadences, quarters = [], [], []
@@ -263,4 +263,4 @@ def loadlc(kic, use_pdc=True, long_cadence=True, from_db=True,
     cadences = cadences[order]
     quarters = quarters[order]
 
-    return times, fluxes, flux_errs, cadences, quarters, flags
+    return times, fluxes, flux_errs, cadences, quarters, flags.astype(int)
