@@ -101,11 +101,11 @@ class InspectorGadget(object):
         if sort_on[-2:] == '_r':
             # Reverse sort
             sort_on = sort_on[:-2]
-            sorted = np.argsort(self.results[sort_on][:])[::-1]
+            sort_arr = np.argsort(self.results[sort_on][:])[::-1]
         else:
-            sorted = np.argsort(self.results[sort_on][:])
+            sort_arr = np.argsort(self.results[sort_on][:])
 
-        self.sort_indices = sorted[np.in1d(sorted, ref_indices[keep])]
+        self.sort_indices = sort_arr[np.in1d(sort_arr, ref_indices[keep])]
 
         # Find the last classified target.
         classified = self.results['class_v2'][keep] != '-1'
@@ -186,14 +186,15 @@ class InspectorGadget(object):
         self.fig_number = self.fig.number
 
         # Setup the light curve plot
-        self.light_curve, = self.ax1.plot(self.times, self.fluxes, color='k')
+        self.light_curve, = self.ax1.step(self.times, self.fluxes, color='k',
+                                          lw=0.5, where='mid')
         self.ax1.set_xlabel('Time (days)')
         self.ax1.set_ylabel('Relative Flux')
 
         if self.pgram_on:
             # Set up the periodgram plot
-            self.periodogram, = self.ax2.plot(self.periods, self.powers,
-                                              color='k')
+            self.periodogram, = self.ax2.step(self.periods, self.powers,
+                                              color='k', lw=0.5, where='mid')
             self.ax2.set_xlim(0, 45)
             self.ax2.set_xlabel('Period (days)')
             self.ax2.set_ylabel('Normalized Power')
@@ -207,7 +208,8 @@ class InspectorGadget(object):
 
         if self.acf_on:
             # Setup the ACF plot
-            self.acf_plot, = self.ax3.plot(self.lags, self.acf, color='k')
+            self.acf_plot, = self.ax3.step(self.lags, self.acf, color='k',
+                                           lw=0.5, where='mid')
             self.ax3.set_xlim(0, 45)
             self.ax3.set_ylim(-1, 1)
             self.ax3.set_xlabel('Lag (days)')
