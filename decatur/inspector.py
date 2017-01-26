@@ -171,9 +171,8 @@ class InspectorGadget(object):
             self.fig, self.ax1 = plt.subplots(nrows=1,
                                               figsize=(7, 12))
         else:
-            self.fig, (self.ax1, self.ax2, self.ax3) = plt.subplots(nrows=3,
-                                                                    figsize=(7, 12))
-            self.fig.subplots_adjust(bottom=0.01, top=0.99, hspace=0.1)
+            self.fig, (self.ax1, self.ax2, self.ax3) = plt.subplots(nrows=3)
+            self.fig.subplots_adjust(bottom=0.03, top=0.99, hspace=0.1)
 
         if self.phase_fold_on:
             self.fig2, self.ax4 = plt.subplots()
@@ -200,9 +199,13 @@ class InspectorGadget(object):
             self.ax2.set_ylabel('Normalized Power')
 
             # Vertical lines at the measured rotation period and orbital period
-            self.p_rot_line_2 = self.ax2.axvline(0, color='r')
-            self.p_orb_line_2 = self.ax2.axvline(0, color='b')
-            self.p_final_line_2 = self.ax2.axvline(0, color='g', lw=2, ls='--')
+            self.p_rot_line_2 = self.ax2.axvline(0, color='r', ymin=-0.1,
+                                                 ymax=0, clip_on=False)
+            self.p_orb_line_2 = self.ax2.axvline(0, color='b', ymin=-0.1,
+                                                 ymax=0, clip_on=False)
+            self.p_final_line_2 = self.ax2.axvline(0, color='g', lw=2, ls='--',
+                                                   ymin=-0.1, ymax=0,
+                                                   clip_on=False)
         else:
             self.subplot_list.remove('2')
 
@@ -216,9 +219,13 @@ class InspectorGadget(object):
             self.ax3.set_ylabel('ACF')
 
             # Vertical lines a orbital period and highest peak
-            self.p_rot_line_3 = self.ax3.axvline(0, color='r')
-            self.p_orb_line_3 = self.ax3.axvline(0, color='b')
-            self.p_final_line_3 = self.ax3.axvline(0, color='g', lw=2, ls='--')
+            self.p_rot_line_3 = self.ax3.axvline(0, color='r', ymin=-0.1,
+                                                 ymax=0, clip_on=False)
+            self.p_orb_line_3 = self.ax3.axvline(0, color='b', ymin=-0.1,
+                                                 ymax=0, clip_on=False)
+            self.p_final_line_3 = self.ax3.axvline(0, color='g', lw=2, ls='--',
+                                                   ymin=-0.1, ymax=0,
+                                                   clip_on=False)
         else:
             self.subplot_list.remove('3')
 
@@ -287,13 +294,21 @@ class InspectorGadget(object):
         flux_max = np.percentile(np.abs(eb.l_curve.fluxes), 98)
         self.ax1.set_ylim(-flux_max, flux_max)
 
+        if self.pgram_on and not self.acf_on:
+            xmax = self.results['pgram/p_rot_1'][index]
+        elif not self.pgram_on and self.acf_on:
+            xmax = self.results['acf/p_rot_1'][index]
+        else:
+            xmax = np.max([self.results['pgram/p_rot_1'][index],
+                           self.results['acf/p_rot_1'][index]])
+
         if self.pgram_on:
             periods = self.h5['{}/periods'.format(kic)][:]
             powers = self.h5['{}/powers'.format(kic)][:]
             self.periodogram.set_xdata(periods)
             self.periodogram.set_ydata(powers)
 
-            self.ax2.set_xlim(0, 45)
+            self.ax2.set_xlim(0, 2.5 * xmax)
             self.ax2.set_ylim(0, 1.1 * powers.max())
 
             self.p_rot_line_2.set_xdata(self.results['pgram/p_rot_1'][index])
@@ -309,7 +324,7 @@ class InspectorGadget(object):
             acf = self.h5_acf['{}/acf'.format(kic)][:]
             self.acf_plot.set_xdata(lags)
             self.acf_plot.set_ydata(acf / acf.max())
-            self.ax3.set_xlim(0, 45)
+            self.ax3.set_xlim(0, 2.5 * xmax)
             self.ax3.set_ylim(-1, 1)
 
             self.p_rot_line_3.set_xdata(self.results['acf/p_rot_1'][index])
@@ -346,13 +361,13 @@ class InspectorGadget(object):
         user_class = input('\nType of out-of-eclipse variability: ').lower()
         print()
 
-        if user_class not in ['sp', 'sp?', 'ev', 'ot', 'fl']:
+        if user_class not in ['sp!', 'spx', 'sp?', 'ev', 'ot', 'fl']:
             print('Invalid classification type.')
             return
 
         self.results['class_v2'][index] = str(user_class)
 
-        if user_class == 'sp':
+        if user_class == 'sp!':
             for metric, name in zip(['pgram', 'acf'], ['Periodogram', 'ACF']):
                 good = input('{} period correct?: '.format(name)).lower()
 
