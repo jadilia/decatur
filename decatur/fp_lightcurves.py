@@ -8,6 +8,8 @@ from __future__ import print_function, division, absolute_import
 
 import os
 
+from astropy.io import fits
+import numpy as np
 import pandas as pd
 import wget
 
@@ -54,3 +56,58 @@ def download_lc():
                 if not os.path.exists('{}/{}'.format(lc_dir, filename)):
                     wget.download('{}{}'.format(base_url, filename),
                                   '{}/{}'.format(lc_dir, filename))
+
+
+def loadlc(kic, lc_type='fed'):
+    """
+    Load false positive extracted light curves.
+
+    Parameters
+    ----------
+    kic : int
+        The KIC number of the FP star.
+    lc_type : {'fed', 'ped', 'snr'}
+        Choose light curve optimized for flux eclipse depth,
+        percent eclipse depth, or SNR.
+
+    Returns
+    -------
+    times : ndarray
+        Kepler times of center of exposure.
+    fluxes : ndarray
+        Kepler fluxes for each quarter.
+    flux_errs : ndarray
+        Kepler flux errors for each exposure.
+    cadences : ndarray
+        Cadence number.
+    quarters : ndarray
+        Kepler quarter.
+    flags : ndarray
+        Kepler data quality flags.
+    """
+    hdu_indices = {'snr': 3, 'ped': 5, 'fed': 7}
+
+    lc_dir = '{}/lc_extract/{:09d}'.format(config.data_dir, kic)
+
+    times, fluxes, flux_errs = [], [], []
+    flags, cadences, quarters = [], [], []
+
+    # TODO: Fetch files if not downloaded
+    for filename in os.listdir(lc_dir):
+
+        if filename[-4:] == 'fits':
+
+            hdu = fits.open('{}/{}'.format(lc_dir, filename))
+
+            hdu_data = hdu[hdu_indices[lc_type]].data
+
+            times = np.append(times, hdu_data['time'])
+            fluxes = np.append(fluxes, hdu_data['flux'])
+            flux_errs = np.append(flux_errs, hdu_data['flux_err'])
+            flags = np.append(flags, hdu_data['quality'])
+            cadences = np.append(cadences, hdu_data['cadenceno'])
+            quarter = np.repeat(int(hdu[0].header['quarter']),
+                                len(hdu_data))
+            quarters = np.append(quarters, quarter)
+
+    return times, fluxes, flux_errs, cadences, quarters, flags.astype(int)
