@@ -487,30 +487,42 @@ class InspectorGadget(object):
 
         plt.close()
 
-    def p_orb_p_rot(self):
+    def p_orb_p_rot(self, ptype='acf'):
         """
         Display light curves by selection on the P_orb/P_rot diagram.
+
+        Parameters
+        ----------
+        ptype : {'acf', 'pgram'}
+            Use rotation period measured from ACF or periodogram.
         """
         self._setup()
         self._update(self.start_index)
 
+        p_rot = self.results['{}/p_rot_1'.format(ptype)][:]
+        p_man = self.results['{}/p_man'.format(ptype)][:]
+        p_man_true = p_man > 0
+        p_rot[p_man_true] = p_man[p_man_true]
+
         self.xx = self.results['p_orb'][:]
-        self.yy = self.results['p_orb'][:] / self.results['acf/p_rot_1'][:]
+        self.yy = self.results['p_orb'][:] / p_rot
 
         self.xx[~np.isfinite(self.xx)] = 0
         self.yy[~np.isfinite(self.yy)] = 0
 
-        sp_mask = self.results['class'][:] == 'sp'
-        self.xx[~sp_mask] = -9
-        self.yy[~sp_mask] = -9
+        checked = (self.results['{}/p_man'.format(ptype)][:] > -98) & \
+                  (self.results['class_v2'][:] == 'sp!')
+
+        self.xx[~checked] = -9
+        self.yy[~checked] = -9
 
         # Plot P_orb/P_rot vs. P_orb
         self.fig_s, self.ax_s = plt.subplots()
 
-        self.ax_s.scatter(self.xx, self.yy, color='r')
+        self.ax_s.scatter(self.xx, self.yy, color='k', s=1)
 
         for line in [0.5, 1, 2]:
-            self.ax_s.axhline(line, color='k', ls=':')
+            self.ax_s.axhline(line, color='k', ls=':', lw=0.2)
 
         self.ax_s.set_xlabel('$P_{orb} (days)$')
         self.ax_s.set_ylabel('$P_{orb}/P_{rot}$')
@@ -519,7 +531,7 @@ class InspectorGadget(object):
         self.ax_s.set_xscale('log')
         self.ax_s.set_yscale('log')
 
-        self.click_point, = self.ax_s.plot([0], [0], 'ok', zorder=2)
+        self.click_point, = self.ax_s.plot([0], [0], 'or', zorder=2, markersize=1)
 
         def on_click(event):
 
