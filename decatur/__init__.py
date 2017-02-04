@@ -3,4 +3,4 @@
 from __future__ import absolute_import
 
 from . import analyze_sample, eclipsing_binary, inspector, kepler_data, \
-    results_plots, fp_lightcurves
+    results_plots, fp_lightcurves, pf_subtract
