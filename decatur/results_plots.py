@@ -18,7 +18,7 @@ from . import analyze_sample, eclipsing_binary, utils
 from .config import data_dir, repo_data_dir
 
 
-def plot_prot_porb(class_file, plot_file=None, catalog_file='kebc.csv'):
+def plot_prot_porb(class_file, plot_file=None):
     """
     Plot P_orb / P_rot vs. P_orb.
 
@@ -28,12 +28,11 @@ def plot_prot_porb(class_file, plot_file=None, catalog_file='kebc.csv'):
         Pickle file containing the classifications and rotation periods.
     plot_file : str, optional
         Specify an alternate output plot file.
-    catalog_file : str, optional
-        Specify an alternate eclipsing binary catalog filename.
     """
     h5 = h5py.File('{}/{}'.format(repo_data_dir, class_file), 'r')
 
-    fig, ax = plt.subplots()
+    plt.rcParams['font.size'] = 20
+    fig, (ax1, ax2) = plt.subplots(nrows=2, sharex=True, figsize=(8, 10))
 
     checked = (h5['acf/p_man'][:] > -98) & (h5['class'][:] == 'sp')
 
@@ -44,25 +43,28 @@ def plot_prot_porb(class_file, plot_file=None, catalog_file='kebc.csv'):
 
     p_orb_p_rot = h5['p_orb'][checked] / p_rot
 
-    for line in [0.5, 1, 2]:
-        ax.axhline(line, color='k', ls=':')
+    ax1.axhline(1, color='k', ls=':', lw=1)
+    ax1.scatter(h5['p_orb'][checked], p_orb_p_rot, color='k',
+                s=5, zorder=4)
+    ax1.set_xscale('log')
+    ax1.set_yscale('log')
+    ax1.set_ylabel('$P_{orb}/P_{rot}$')
+    ax1.minorticks_on()
 
-    ax.scatter(h5['p_orb'][checked], p_orb_p_rot, color='r',
-               s=5, zorder=4)
-
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.set_xlim(0.1, 100)
-    ax.set_ylim(0.01, 100)
-    ax.set_xlabel('$P_{orb}$ (days)')
-    ax.set_ylabel('$P_{orb}/P_{rot}$')
-    ax.minorticks_on()
+    ax2.axhline(1, color='k', ls=':', lw=1)
+    ax2.scatter(h5['p_orb'][checked], p_orb_p_rot, color='k',
+                s=5, zorder=4)
+    ax2.set_ylim(0, 3)
+    ax2.set_xlabel('$P_{orb}$ (days)')
+    ax2.set_ylabel('$P_{orb}/P_{rot}$')
+    ax2.minorticks_on()
 
     if plot_file is None:
         today = '{:%Y%m%d}'.format(datetime.date.today())
         plot_file = 'rotation_periods.{}.pdf'.format(today)
 
-    plt.savefig('{}/{}'.format(data_dir, plot_file))
+    fig.subplots_adjust(hspace=0.05)
+    plt.savefig('{}/{}'.format(data_dir, plot_file), bbox_inches='tight')
 
 
 def synchronization_histogram(class_file, dy=0.025, plot_file=None,
@@ -382,7 +384,3 @@ def class_examples(class_id='sp'):
         ax.set_ylabel('Relative Flux')
 
     plt.show()
-
-
-
-
