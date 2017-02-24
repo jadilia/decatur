@@ -80,7 +80,7 @@ def load_kebc_lc(kic, flux_type='dtr', pf_type='decon'):
     df_lc = pd.read_csv(lc_filename, comment='#', delim_whitespace=True,
                         names=lc_names, usecols=np.arange(0, 8))
 
-    times = df_lc['bjd'].values
+    times = df_lc['bjd'].values - 54833
     phases = df_lc['phase'].values
     fluxes = df_lc['{}_flux'.format(flux_type)].values
     flux_errs = df_lc['{}_err'.format(flux_type)].values
